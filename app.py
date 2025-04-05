@@ -72,14 +72,14 @@ filtered_df = df[
 # Create a map of entry points
 st.subheader("Traffic Flow by Entry Point")
 
-# Initialize session state for selected points if not exists
-if 'selected_points' not in st.session_state:
-    st.session_state.selected_points = set()
-
 # Get traffic by detection group
 entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
 total_traffic = entry_traffic['CRZ Entries'].sum()
 entry_traffic['percentage'] = (entry_traffic['CRZ Entries'] / total_traffic * 100).round(1)
+
+# Initialize session state for selected points if not exists
+if 'selected_points' not in st.session_state:
+    st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
 
 # Map coordinates for the entry points based on Detection Group
 coordinates = {
@@ -96,52 +96,6 @@ coordinates = {
     "Manhattan Bridge": (40.7075, -73.9903),
     "Hugh L. Carey Tunnel": (40.7017, -74.0132)
 }
-
-# Create the map
-fig = go.Figure()
-
-# Central point for Manhattan Congestion Zone
-center_lat, center_lon = 40.7580, -73.9855
-
-# Add entry points with arrows pointing to the center
-for _, row in entry_traffic.iterrows():
-    location = row['Detection Group']
-    
-    # Skip if we don't have coordinates
-    if location not in coordinates:
-        continue
-        
-    lat, lon = coordinates[location]
-    
-    # Determine marker color based on selection
-    marker_color = 'green' if location in st.session_state.selected_points else 'darkblue'
-    
-    # Add the entry point marker
-    fig.add_trace(go.Scattermapbox(
-        lat=[lat],
-        lon=[lon],
-        mode='markers',
-        marker=dict(size=15, color=marker_color),
-        text=[f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"],
-        textposition="top center",
-        name=location,
-        hoverinfo='text'  # Only show the text on hover
-    ))
-
-# Update the layout
-fig.update_layout(
-    mapbox=dict(
-        style="open-street-map",
-        zoom=11.3,
-        center=dict(lat=center_lat, lon=center_lon)
-    ),
-    margin=dict(l=0, r=0, t=0, b=0),
-    height=600,
-    legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-)
-
-# Display the map
-st.plotly_chart(fig, use_container_width=True)
 
 # Add select all and deselect all buttons in a row
 col1, col2 = st.columns(2)
@@ -172,10 +126,60 @@ for i, location in enumerate(sorted(entry_traffic['Detection Group'].unique())):
         st.rerun()
 
 # Filter traffic data based on selected points
-if st.session_state.selected_points:
-    filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.session_state.selected_points)]
-else:
-    filtered_traffic = entry_traffic
+filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.session_state.selected_points)]
+
+# Calculate total traffic for selected points only
+selected_total = filtered_traffic['CRZ Entries'].sum()
+filtered_traffic['percentage'] = (filtered_traffic['CRZ Entries'] / selected_total * 100).round(1)
+
+# Create the map
+fig = go.Figure()
+
+# Central point for Manhattan Congestion Zone
+center_lat, center_lon = 40.7580, -73.9855
+
+# Add entry points with arrows pointing to the center
+for _, row in entry_traffic.iterrows():
+    location = row['Detection Group']
+    
+    # Skip if we don't have coordinates
+    if location not in coordinates:
+        continue
+        
+    lat, lon = coordinates[location]
+    
+    # Determine marker color based on selection
+    marker_color = 'green' if location in st.session_state.selected_points else 'darkblue'
+
+    hover_text = f"{location}: {filtered_traffic[filtered_traffic['Detection Group'] == location]['percentage'].iloc[0]}%" \
+    if location in st.session_state.selected_points else location
+    
+    # Add the entry point marker
+    fig.add_trace(go.Scattermapbox(
+        lat=[lat],
+        lon=[lon],
+        mode='markers',
+        marker=dict(size=15, color=marker_color),
+        text=[hover_text],  # Show location and percentage
+        textposition="top center",
+        name=location,
+        hoverinfo='text'  # Only show the text on hover
+    ))
+
+# Update the layout
+fig.update_layout(
+    mapbox=dict(
+        style="open-street-map",
+        zoom=11.3,
+        center=dict(lat=center_lat, lon=center_lon)
+    ),
+    margin=dict(l=0, r=0, t=0, b=0),
+    height=600,
+    legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+)
+
+# Display the map
+st.plotly_chart(fig, use_container_width=True)
 
 # Display traffic summary
 st.subheader("Traffic Summary")
@@ -197,7 +201,9 @@ with summary_col1:
 
 with summary_col2:
     # Traffic volume by hour
-    hourly_traffic = filtered_df.groupby('hour')['CRZ Entries'].sum().reset_index()
+    # Filter data for selected points
+    hourly_filtered_df = filtered_df[filtered_df['Detection Group'].isin(st.session_state.selected_points)]
+    hourly_traffic = hourly_filtered_df.groupby('hour')['CRZ Entries'].sum().reset_index()
     fig_hourly = px.line(
         hourly_traffic, 
         x='hour', 
@@ -264,7 +270,10 @@ for _, row in hourly_entry_traffic.iterrows():
         lat=[lat],
         lon=[lon],
         mode='markers',
-        marker=dict(size=15, color='darkblue'),
+        marker=dict(
+            size=10 + (row['CRZ Entries'] / hourly_total * 30),  # Scale size based on entries
+            color='darkblue'
+        ),
         name=location
     ))
 
