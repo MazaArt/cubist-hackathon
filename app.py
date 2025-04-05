@@ -144,7 +144,8 @@ def main():
                 x='hour',
                 y='CRZ Entries',
                 title='Traffic Volume by Hour',
-                labels={'hour': 'Hour of Day', 'CRZ Entries': 'Number of Vehicles'}
+                labels={'hour': 'Hour of Day', 'CRZ Entries': 'Number of Vehicles'},
+                line_shape='spline'
             )
             st.plotly_chart(fig_hourly, use_container_width=True)
 
