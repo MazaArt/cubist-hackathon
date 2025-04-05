@@ -326,6 +326,19 @@ with time_flow_tab:
             # Add time-based visualization section
             st.subheader("Traffic Volume Over Time")
             
+            # Load population data if available
+            @st.cache_data
+            def load_population_data():
+                try:
+                    with open('entry_point_populations.json', 'r') as f:
+                        return json.load(f)
+                except Exception as e:
+                    st.warning(f"Population data not available. Run generate_population_data.py first. Error: {e}")
+                    return {}
+            
+            # Load population data
+            population_data = load_population_data()
+            
             # Add date and time sliders
             unique_dates = sorted(pd.to_datetime(rideshare_df['datehour']).dt.date.unique())
             
@@ -418,13 +431,15 @@ with time_flow_tab:
                 st.subheader(f"Traffic at {selected_date} {selected_hour:02d}:00")
                 
                 # Add display toggles
-                toggle_col1, toggle_col2, toggle_col3 = st.columns(3)
+                toggle_col1, toggle_col2, toggle_col3, toggle_col4 = st.columns(4)
                 with toggle_col1:
                     show_regions = st.checkbox("Show Entry Point Regions", value=True)
                 with toggle_col2:
                     show_subway = st.checkbox("Show Subway Stations", value=True)
                 with toggle_col3:
                     show_buses = st.checkbox("Show Top Bus Routes", value=True)
+                with toggle_col4:
+                    show_population = st.checkbox("Show Population Data", value=False)
                 
                 # Create a new flow map for traffic visualization
                 traffic_map = go.Figure()
@@ -482,7 +497,7 @@ with time_flow_tab:
                             lat=lats,
                             lon=lons,
                             z=[1] * len(lats),  # Uniform density
-                            radius=15,  # Increased from 10
+                            radius=20,  # Increased from 15 to make regions larger
                             colorscale=[[0, entry_colors[entry]], [1, entry_colors[entry]]],
                             showscale=False,
                             hoverinfo='none',
@@ -643,6 +658,102 @@ with time_flow_tab:
                             
                             # Mark this entry as added to legend
                             entry_added_to_legend.add(entry)
+                
+                # Add population data visualization if enabled
+                if show_population and population_data:
+                    # Create a dataframe for the population data
+                    pop_data = []
+                    for entry in entry_points:
+                        if entry in population_data:
+                            pop_data.append({
+                                'Entry Point': entry,
+                                'Population': population_data[entry]['total_population'],
+                                'Borough': population_data[entry]['borough'],
+                                'Color': entry_colors.get(entry, '#333333')
+                            })
+                    
+                    if pop_data:
+                        pop_df = pd.DataFrame(pop_data)
+                        
+                        # Create a population bar chart
+                        pop_chart = px.bar(
+                            pop_df, 
+                            x='Entry Point', 
+                            y='Population',
+                            color='Entry Point',
+                            color_discrete_map={entry: color for entry, color in zip(pop_df['Entry Point'], pop_df['Color'])},
+                            title='Estimated Population by Entry Point Region',
+                            labels={'Population': 'Estimated Population', 'Entry Point': 'Entry Point'}
+                        )
+                        
+                        # Customize the layout
+                        pop_chart.update_layout(
+                            xaxis=dict(tickangle=-45),
+                            yaxis=dict(title='Population'),
+                            height=400,
+                            margin=dict(l=20, r=20, t=50, b=100)
+                        )
+                        
+                        # Display the chart
+                        st.plotly_chart(pop_chart, use_container_width=True)
+                        
+                        # Add annotations to the map showing population
+                        for entry in entry_points:
+                            if entry in coordinates and entry in population_data:
+                                lat, lon = coordinates[entry]
+                                pop = population_data[entry]['total_population']
+                                
+                                # Calculate a position offset from the port (further away from Manhattan center)
+                                center_lat, center_lon = 40.7380, -73.9855  # Manhattan center
+                                
+                                # Calculate direction away from center
+                                dir_lat = lat - center_lat
+                                dir_lon = lon - center_lon
+                                
+                                # Normalize and apply larger offset (move further away from Manhattan)
+                                dist = np.sqrt(dir_lat**2 + dir_lon**2)
+                                if dist > 0:
+                                    offset_lat = 0.018 * (dir_lat/dist)  # About 1.8km away (increased from 1.2km)
+                                    offset_lon = 0.018 * (dir_lon/dist)
+                                else:
+                                    offset_lat, offset_lon = 0.018, 0  # Default offset if same as center
+                                
+                                # Calculate circle position (offset from the port location)
+                                circle_lat = lat + offset_lat
+                                circle_lon = lon + offset_lon
+                                
+                                # Normalize population to get circle size
+                                max_pop = max(population_data[e]['total_population'] for e in population_data)
+                                rel_size = pop / max_pop
+                                
+                                # Create population circle
+                                size = 20 + (rel_size * 80)  # Scale from 20 to 100
+                                
+                                # Use circles instead of bars - more reliable in Scattermapbox
+                                traffic_map.add_trace(go.Scattermapbox(
+                                    lat=[circle_lat],
+                                    lon=[circle_lon],
+                                    mode='markers',
+                                    marker=dict(
+                                        size=size,
+                                        color='rgb(128, 0, 128)',  # Purple
+                                        opacity=0.5  # Reduced from 0.7 to make it more transparent
+                                    ),
+                                    hovertext=f"{entry} Region: {pop:,} people",
+                                    hoverinfo='text',
+                                    showlegend=False
+                                ))
+                        
+                        # Add population info box
+                        st.info("""
+                            **Population Data Information**
+                            
+                            The population estimates shown are approximations based on neighborhoods near each entry point.
+                            Purple circles on the map indicate the estimated population in the region around each entry point.
+                            
+                            The circles are positioned in the areas associated with each entry point.
+                            Circle size corresponds to relative population - larger circles indicate higher populations.
+                        """)
                 
                 # Update the layout
                 traffic_map.update_layout(
