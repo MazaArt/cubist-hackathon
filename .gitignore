@@ -44,3 +44,4 @@ env/
 Thumbs.db 
 
 .venv/
+processed_rideshare.csv
