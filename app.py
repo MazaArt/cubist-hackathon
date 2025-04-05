@@ -72,6 +72,15 @@ filtered_df = df[
 # Create a map of entry points
 st.subheader("Traffic Flow by Entry Point")
 
+# Initialize session state for selected points if not exists
+if 'selected_points' not in st.session_state:
+    st.session_state.selected_points = set()
+
+# Get traffic by detection group
+entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
+total_traffic = entry_traffic['CRZ Entries'].sum()
+entry_traffic['percentage'] = (entry_traffic['CRZ Entries'] / total_traffic * 100).round(1)
+
 # Map coordinates for the entry points based on Detection Group
 coordinates = {
     "Brooklyn Bridge": (40.7061, -73.9969),
@@ -87,11 +96,6 @@ coordinates = {
     "Manhattan Bridge": (40.7075, -73.9903),
     "Hugh L. Carey Tunnel": (40.7017, -74.0132)
 }
-
-# Get traffic by detection group
-entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
-total_traffic = entry_traffic['CRZ Entries'].sum()
-entry_traffic['percentage'] = (entry_traffic['CRZ Entries'] / total_traffic * 100).round(1)
 
 # Create the map
 fig = go.Figure()
@@ -109,12 +113,15 @@ for _, row in entry_traffic.iterrows():
         
     lat, lon = coordinates[location]
     
+    # Determine marker color based on selection
+    marker_color = 'red' if location in st.session_state.selected_points else 'blue'
+    
     # Add the entry point marker
     fig.add_trace(go.Scattermapbox(
         lat=[lat],
         lon=[lon],
         mode='markers+text',
-        marker=dict(size=15, color='blue'),
+        marker=dict(size=15, color=marker_color),
         text=[f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"],
         textposition="top center",
         name=location,
@@ -133,18 +140,42 @@ fig.update_layout(
     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
 )
 
+# Display the map
 st.plotly_chart(fig, use_container_width=True)
+
+# Add selection buttons in a more compact layout
+st.write("Select entry points to focus on:")
+cols = st.columns(4)  # Create 4 columns
+for i, location in enumerate(sorted(entry_traffic['Detection Group'].unique())):
+    col = cols[i % 4]  # Distribute buttons across columns
+    is_selected = location in st.session_state.selected_points
+    if col.button(
+        f"{'✓' if is_selected else ''} {location}",
+        key=f"btn_{location}",
+        type="primary" if is_selected else "secondary"
+    ):
+        if is_selected:
+            st.session_state.selected_points.remove(location)
+        else:
+            st.session_state.selected_points.add(location)
+        st.rerun()
+
+# Filter traffic data based on selected points
+if st.session_state.selected_points:
+    filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.session_state.selected_points)]
+else:
+    filtered_traffic = entry_traffic
 
 # Display traffic summary
 st.subheader("Traffic Summary")
 summary_col1, summary_col2 = st.columns(2)
 
 with summary_col1:
-    st.metric("Total Traffic", f"{total_traffic:,} vehicles")
+    st.metric("Total Traffic", f"{filtered_traffic['CRZ Entries'].sum():,} vehicles")
     
     # Display traffic by detection group
     st.dataframe(
-        entry_traffic.sort_values('CRZ Entries', ascending=False),
+        filtered_traffic.sort_values('CRZ Entries', ascending=False),
         column_config={
             'Detection Group': 'Entry Point',
             'CRZ Entries': 'Traffic Volume',
@@ -232,7 +263,7 @@ for _, row in hourly_entry_traffic.iterrows():
         lat=[lat],
         lon=[lon],
         mode='markers+text',
-        marker=dict(size=10, color='blue'),
+        marker=dict(size=15, color='blue'),
         text=[f"{row['percentage']}%"],
         textposition="top center",
         name=location
