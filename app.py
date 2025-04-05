@@ -4,6 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime, timedelta
+import math
+import colorsys
+import random
 
 # Set page config
 st.set_page_config(
@@ -200,8 +203,220 @@ fig.update_layout(
 time_flow_tab, before_after_tab = st.tabs(['Time Flow Map', 'Before-After Subway Map'])
 
 with time_flow_tab:
-    # @Will Write your changes here
-    print("TODO")
+    # Read the processed rideshare data
+    @st.cache_data
+    def load_rideshare_data():
+        rideshare_df = pd.read_csv("processed_rideshare.csv")
+        return rideshare_df
+    
+    try:
+        with st.spinner('Loading rideshare data...'):
+            rideshare_df = load_rideshare_data()
+            
+            # Extract unique station complexes and their locations
+            station_complexes = rideshare_df[['station_complex', 'latitude', 'longitude']].drop_duplicates()
+            
+            # Display information about the stations
+            st.write(f"Total unique station complexes: {len(station_complexes)}")
+            
+            # Save the unique stations to a new CSV
+            station_complexes.to_csv("station_locations.csv", index=False)
+            
+            # Function to calculate distance between two coordinates
+            def haversine_distance(lat1, lon1, lat2, lon2):
+                """Calculate the great circle distance between two points in kilometers"""
+                from math import radians, cos, sin, asin, sqrt
+                
+                # Convert decimal degrees to radians
+                lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+                
+                # Haversine formula
+                dlon = lon2 - lon1
+                dlat = lat2 - lat1
+                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                c = 2 * asin(sqrt(a))
+                r = 6371  # Radius of earth in kilometers
+                return c * r
+            
+            # Assign each station to its closest entry point
+            entry_points = list(coordinates.keys())
+            
+            # Create a new column to store the closest entry point for each station
+            station_complexes['closest_entry'] = None
+            station_complexes['entry_distance'] = float('inf')
+            
+            # Calculate closest entry point for each station
+            for idx, station in station_complexes.iterrows():
+                min_distance = float('inf')
+                closest_entry = None
+                
+                for entry in entry_points:
+                    entry_lat, entry_lon = coordinates[entry]
+                    distance = haversine_distance(
+                        station['latitude'], station['longitude'],
+                        entry_lat, entry_lon
+                    )
+                    
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_entry = entry
+                
+                station_complexes.at[idx, 'closest_entry'] = closest_entry
+                station_complexes.at[idx, 'entry_distance'] = min_distance
+            
+            # Create a color mapping for each entry point
+            import colorsys
+            import random
+            
+            # Generate distinct colors for each entry point
+            def generate_distinct_colors(n):
+                colors = []
+                for i in range(n):
+                    h = i / n
+                    s = 0.7 + random.random() * 0.3
+                    v = 0.7 + random.random() * 0.3
+                    rgb = colorsys.hsv_to_rgb(h, s, v)
+                    colors.append(f'rgb({int(rgb[0]*255)}, {int(rgb[1]*255)}, {int(rgb[2]*255)})')
+                return colors
+            
+            # Generate colors for each entry point
+            entry_colors = dict(zip(entry_points, generate_distinct_colors(len(entry_points))))
+            
+            # Group stations by their closest entry
+            entry_station_groups = station_complexes.groupby('closest_entry')
+            
+            # Create a new flow map
+            flow_map = go.Figure()
+            
+            # Add toggle for region visualization
+            show_regions = st.checkbox("Show Entry Point Regions", value=False)
+            
+            # Create regions using approximate Voronoi diagram approach
+            if show_regions:
+                # Generate a grid of points covering NYC
+                lat_min, lat_max = 40.55, 40.90  # NYC latitude range
+                lon_min, lon_max = -74.05, -73.85  # NYC longitude range
+                grid_size = 100  # Number of points in each dimension
+                
+                lat_grid = np.linspace(lat_min, lat_max, grid_size)
+                lon_grid = np.linspace(lon_min, lon_max, grid_size)
+                
+                # Create a grid of points
+                grid_points = []
+                for lat in lat_grid:
+                    for lon in lon_grid:
+                        grid_points.append((lat, lon))
+                
+                # Assign each grid point to the closest entry point
+                grid_assignments = {}
+                for entry in entry_points:
+                    grid_assignments[entry] = []
+                
+                for lat, lon in grid_points:
+                    min_distance = float('inf')
+                    closest_entry = None
+                    
+                    for entry in entry_points:
+                        if entry in coordinates:
+                            entry_lat, entry_lon = coordinates[entry]
+                            distance = haversine_distance(lat, lon, entry_lat, entry_lon)
+                            
+                            if distance < min_distance:
+                                min_distance = distance
+                                closest_entry = entry
+                    
+                    if closest_entry:
+                        grid_assignments[closest_entry].append((lat, lon))
+                
+                # Add regions to the map
+                for entry, points in grid_assignments.items():
+                    if not points:
+                        continue
+                        
+                    # Extract lat/lon arrays
+                    lats = [p[0] for p in points]
+                    lons = [p[1] for p in points]
+                    
+                    # Add the region as a scatter density map
+                    flow_map.add_trace(go.Densitymapbox(
+                        lat=lats,
+                        lon=lons,
+                        z=[1] * len(lats),  # Uniform density
+                        radius=15,  # Increased from 10
+                        colorscale=[[0, entry_colors[entry]], [1, entry_colors[entry]]],
+                        showscale=False,
+                        hoverinfo='none',
+                        opacity=0.5,  # Increased from 0.3
+                        name=f"{entry} Region"
+                    ))
+            
+            # Add entry points with their specific colors
+            for entry in entry_points:
+                if entry in coordinates:
+                    lat, lon = coordinates[entry]
+                    color = entry_colors[entry]
+                    
+                    # Add the entry point marker
+                    flow_map.add_trace(go.Scattermapbox(
+                        lat=[lat],
+                        lon=[lon],
+                        mode='markers',
+                        marker=dict(
+                            size=12,
+                            color=color
+                        ),
+                        text=[entry],
+                        name=f"{entry}",
+                        hoverinfo='text'
+                    ))
+            
+            # Add stations colored by their closest entry point
+            for entry, group in entry_station_groups:
+                if entry in entry_colors:
+                    flow_map.add_trace(go.Scattermapbox(
+                        lat=group['latitude'],
+                        lon=group['longitude'],
+                        mode='markers',
+                        marker=dict(
+                            size=5,
+                            color=entry_colors[entry],
+                            opacity=0.6
+                        ),
+                        text=group['station_complex'] + " (near " + entry + ")",
+                        name=f"Stations near {entry}",
+                        hoverinfo='text'
+                    ))
+            
+            # Update the layout
+            flow_map.update_layout(
+                mapbox=dict(
+                    style="carto-positron",  # Changed from "open-street-map" to a cleaner style
+                    zoom=11,
+                    center=dict(lat=40.7380, lon=-73.9855)
+                ),
+                margin=dict(l=0, r=0, t=0, b=0),
+                height=600,
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.01,
+                    itemsizing="constant"
+                )
+            )
+            
+            # Display the map with grouped and colored stations
+            st.subheader("Subway Stations Grouped by Closest Entry Point")
+            st.plotly_chart(flow_map, use_container_width=True)
+            
+            # Display some statistics about the grouping
+            st.subheader("Station Distribution by Entry Point")
+            entry_counts = station_complexes['closest_entry'].value_counts().reset_index()
+            entry_counts.columns = ['Entry Point', 'Number of Stations']
+            st.dataframe(entry_counts, hide_index=True)
+            
+    except Exception as e:
+        st.error(f"Error processing rideshare data: {e}")
     
 with before_after_tab:
     # my changes
