@@ -97,9 +97,6 @@ def main():
         "Select time range (hours)",
         0, 23, (0, 23)
     )
-    
-    # Create a map of entry points
-    st.subheader("Traffic Flow by Entry Point")
 
     # Use multiselect with the current session state
     available_points = sorted(df['Detection Group'].unique())
