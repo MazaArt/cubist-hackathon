@@ -1,6 +1,6 @@
 import plotly.graph_objects as go
 import streamlit as st
-from constants import coordinates
+from constants import COORDINATES
 
 def create_map(entry_traffic, filtered_traffic):
     # Create the map
@@ -14,10 +14,10 @@ def create_map(entry_traffic, filtered_traffic):
         location = row['Detection Group']
         
         # Skip if we don't have coordinates
-        if location not in coordinates:
+        if location not in COORDINATES:
             continue
             
-        lat, lon = coordinates[location]
+        lat, lon = COORDINATES[location]
         
         # Determine marker color based on selection
         marker_color = 'green' if location in st.session_state.selected_points else 'darkblue'
