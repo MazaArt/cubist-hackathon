@@ -85,20 +85,73 @@ def main():
         max_value=df['date'].max()
     )
     
-    # Vehicle type selection
-    st.sidebar.subheader("Vehicle Types")
-    selected_vehicle_types = [
-        vt for vt in vehicle_types 
-        if st.sidebar.checkbox(vt, value=True)
-    ]
-    
     # Time range selection
     time_range = st.sidebar.slider(
         "Select time range (hours)",
         0, 23, (0, 23)
     )
     
-    # Filter data
+    # Create a map of entry points
+    st.subheader("Traffic Flow by Entry Point")
+
+    # Use multiselect with the current session state
+    available_points = sorted(df['Detection Group'].unique())
+    # Initialize session state for selected points if not exists
+    if 'selected_points' not in st.session_state:
+        st.session_state.selected_points = set(available_points)
+
+    # Add custom CSS for smaller buttons
+    st.markdown("""
+        <style>
+        .stButton > button {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            height: auto;
+            min-height: 1.5rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Entry Points Selection
+    st.sidebar.header("Entry Points")
+
+    # Add select all and deselect all buttons
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.sidebar.button("Select All", key="select_all", use_container_width=True):
+            st.session_state.selected_points = set(available_points)
+            st.rerun()
+    with col2:
+        if st.sidebar.button("Deselect All", key="deselect_all", use_container_width=True):
+            st.session_state.selected_points = set()
+            st.rerun()
+
+    # Update session state with new selection
+    selected_points = st.sidebar.multiselect(
+        "Choose entry points:",
+        options=available_points,
+        default=list(st.session_state.selected_points),
+        key="entry_points_select"
+    )
+
+    # Update session state with new selection
+    st.session_state.selected_points = set(selected_points)
+
+    # Add some spacing after the selection
+    st.sidebar.markdown("---")
+
+    # Vehicle Types Selection
+    st.sidebar.header("Vehicle Types")
+    selected_vehicle_types = []
+
+    for vehicle_type in vehicle_types:
+        if st.sidebar.checkbox(vehicle_type, value=True, key=f"vehicle_type_{vehicle_type}"):
+            selected_vehicle_types.append(vehicle_type)
+
+    # Add some spacing after vehicle types
+    st.sidebar.markdown("---")
+
+    # Filter data based on selections
     filtered_df = df[
         (df['date'] >= selected_date_range[0]) & 
         (df['date'] <= selected_date_range[1]) & 
@@ -106,32 +159,19 @@ def main():
         (df['hour'] <= time_range[1]) &
         (df['Vehicle Class'].isin(selected_vehicle_types))
     ]
-    
-    # Entry point selection
-    st.sidebar.header("Entry Points")
-    entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
-    
-    # Initialize session state for selected points
-    if 'selected_points' not in st.session_state:
-        st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
-    
-    # Selection controls
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        if st.button("Select All", key="select_all"):
-            st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
-            st.rerun()
-    with col2:
-        if st.button("Deselect All", key="deselect_all"):
-            st.session_state.selected_points = set()
-            st.rerun()
-    
-    selected_points = st.sidebar.multiselect(
-        "Choose entry points:",
-        options=sorted(entry_traffic['Detection Group'].unique()),
-        default=list(st.session_state.selected_points)
-    )
-    st.session_state.selected_points = set(selected_points)
+    # Get traffic by detection group
+    if len(selected_vehicle_types) == 0:
+        st.warning("No vehicle types selected. Please select at least one vehicle type to see traffic data.")
+        entry_traffic = pd.DataFrame({'Detection Group': list(coordinates.keys()), 'CRZ Entries': [0] * len(coordinates)})
+    else:
+        entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
+    # Filter traffic data based on selected points
+    filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.session_state.selected_points)]
+    # Calculate total traffic for selected points only
+    selected_total = filtered_traffic['CRZ Entries'].sum()
+    filtered_traffic.loc['percentage'] = (filtered_traffic['CRZ Entries'] / max(selected_total, 1) * 100).round(1)
+    total_traffic = entry_traffic['CRZ Entries'].sum()
+    entry_traffic['percentage'] = (entry_traffic['CRZ Entries'] / max(total_traffic, 1) * 100).round(1)
     
     # Main content
     st.subheader("Traffic Flow by Entry Point")
