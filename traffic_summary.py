@@ -27,7 +27,7 @@ def create_main_map(entry_traffic, selected_points):
 
     fig.update_layout(
         mapbox=dict(
-            style="open-street-map",
+            style="carto-positron",
             zoom=11,
             center=dict(lat=CENTER_LAT, lon=CENTER_LON)
         ),
@@ -58,7 +58,7 @@ def create_animation(grouped, max_traffic, min_traffic):
             )
         ],
         layout=dict(
-            mapbox=dict(style="open-street-map", zoom=11, center=dict(lat=CENTER_LAT, lon=CENTER_LON)),
+            mapbox=dict(style="carto-positron", zoom=11, center=dict(lat=CENTER_LAT, lon=CENTER_LON)),
             margin=dict(l=0, r=0, t=40, b=0),
             height=600,
             title="Animated Traffic Flow Over Time",

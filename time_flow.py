@@ -162,7 +162,7 @@ def create_traffic_map(entry_traffic, selected_points, rideshare_df, bus_df, bus
             traffic_map.add_trace(go.Scattermapbox(
                 lat=[lat],
                 lon=[lon],
-                mode='markers+text',
+                mode='markers',
                 marker=dict(size=size, color=entry_colors[entry], opacity=1.0),
                 text=[f"{entry}"],
                 textposition="top center",
