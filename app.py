@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime, timedelta
+from helper import haversine_distance
 
 # Map coordinates for the entry points based on Detection Group
 coordinates = {
@@ -131,8 +132,6 @@ filtered_df = df[
 
 # Create a map of entry points
 st.subheader("Traffic Flow by Entry Point")
-
-# Get traffic by detection group
 entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
 total_traffic = entry_traffic['CRZ Entries'].sum()
 entry_traffic['percentage'] = (entry_traffic['CRZ Entries'] / total_traffic * 100).round(1)
@@ -247,7 +246,7 @@ with time_flow_tab:
     print("TODO")
     
 with before_after_tab:
-    before_after_df
+    before_after_df 
     # my changes
     print("TODO")
 
