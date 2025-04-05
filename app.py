@@ -43,6 +43,7 @@ st.write(f"Date range: {df['date'].min()} to {df['date'].max()}")
 
 # Show unique entry points
 entry_points = df['Detection Region'].unique()
+vehicle_types = sorted(df['Vehicle Class'].unique())
 
 # Date and time selection
 st.sidebar.header("Filter Data")
@@ -52,6 +53,13 @@ selected_date_range = st.sidebar.date_input(
     min_value=df['date'].min(),
     max_value=df['date'].max()
 )
+
+st.sidebar.subheader("Vehicle Types")
+selected_vehicle_types = []
+
+for vehicle_type in vehicle_types:
+    if st.sidebar.checkbox(vehicle_type, value=True):
+        selected_vehicle_types.append(vehicle_type)
 
 # Ensure we have a valid date range
 if len(selected_date_range) != 2:
@@ -68,7 +76,8 @@ filtered_df = df[
     (df['date'] >= selected_date_range[0]) & 
     (df['date'] <= selected_date_range[1]) & 
     (df['hour'] >= time_range[0]) & 
-    (df['hour'] <= time_range[1])
+    (df['hour'] <= time_range[1]) &
+    (df['Vehicle Class'].isin(selected_vehicle_types))
 ]
 
 # Create a map of entry points
