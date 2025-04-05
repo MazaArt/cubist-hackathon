@@ -74,13 +74,18 @@ st.subheader("Traffic Flow by Entry Point")
 
 # Map coordinates for the entry points based on Detection Group
 coordinates = {
-    "Brooklyn": (40.6782, -73.9442),
-    "West Side Highway": (40.7713, -73.9971),
-    "West 60th St": (40.7697, -73.9829),
-    "Queens": (40.7282, -73.7949),
-    "New Jersey": (40.7589, -74.0337),
-    "FDR Drive": (40.7681, -73.9682),
-    "East 60th St": (40.7615, -73.9656)
+    "Brooklyn Bridge": (40.7061, -73.9969),
+    "West Side Highway at 60th St": (40.7714, -73.9900),
+    "West 60th St": (40.7700, -73.9850),
+    "Queensboro Bridge": (40.7553, -73.9500),
+    "Queens Midtown Tunnel": (40.7407, -73.9711),
+    "Lincoln Tunnel": (40.7570, -74.0027),
+    "Holland Tunnel": (40.7270, -74.0119),
+    "FDR Drive at 60th St": (40.7600, -73.9580),
+    "East 60th St": (40.7610, -73.9630),
+    "Williamsburg Bridge": (40.7101, -73.9712),
+    "Manhattan Bridge": (40.7075, -73.9903),
+    "Hugh L. Carey Tunnel": (40.7017, -74.0132)
 }
 
 # Get traffic by detection group
@@ -104,31 +109,13 @@ for _, row in entry_traffic.iterrows():
         
     lat, lon = coordinates[location]
     
-    # Calculate arrow path
-    # Start from the entry point and go 80% toward the center
-    mid_lat = lat + 0.8 * (center_lat - lat)
-    mid_lon = lon + 0.8 * (center_lon - lon)
-    
-    # Line width scaled by percentage of traffic
-    line_width = 1 + (row['percentage'] / 5)
-    
-    # Add the arrow line
-    fig.add_trace(go.Scattermapbox(
-        lat=[lat, mid_lat],
-        lon=[lon, mid_lon],
-        mode='lines',
-        line=dict(width=line_width, color='blue'),
-        name=location,
-        text=f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"
-    ))
-    
     # Add the entry point marker
     fig.add_trace(go.Scattermapbox(
         lat=[lat],
         lon=[lon],
         mode='markers+text',
         marker=dict(size=10, color='blue'),
-        text=[f"{row['percentage']}%"],
+        text=[f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"],
         textposition="top center",
         name=location
     ))
