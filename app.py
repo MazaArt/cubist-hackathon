@@ -32,7 +32,6 @@ def load_data():
 with st.spinner('Loading data... This may take a moment.'):
     try:
         df = load_data()
-        st.success('Data loaded successfully!')
     except Exception as e:
         st.error(f"Error loading data: {e}")
         st.stop()
@@ -44,8 +43,6 @@ st.write(f"Date range: {df['date'].min()} to {df['date'].max()}")
 
 # Show unique entry points
 entry_points = df['Detection Region'].unique()
-st.write(f"Entry points: {len(entry_points)}")
-st.write(f"Entry locations: {', '.join(sorted(entry_points))}")
 
 # Date and time selection
 st.sidebar.header("Filter Data")
@@ -55,6 +52,10 @@ selected_date_range = st.sidebar.date_input(
     min_value=df['date'].min(),
     max_value=df['date'].max()
 )
+
+# Ensure we have a valid date range
+if len(selected_date_range) != 2:
+    selected_date_range = (df['date'].min(), df['date'].max())
 
 # Time range slider
 time_range = st.sidebar.slider(
@@ -82,6 +83,58 @@ entry_traffic['percentage'] = (entry_traffic['CRZ Entries'] / total_traffic * 10
 if 'selected_points' not in st.session_state:
     st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
 
+# Add custom CSS for smaller buttons
+st.markdown("""
+    <style>
+    .stButton > button {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+        height: auto;
+        min-height: 1.5rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Entry point selection in sidebar
+st.sidebar.header("Entry Points")
+st.sidebar.write("Select entry points to focus on:")
+
+# Add select all and deselect all buttons in a row with smaller text
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    if st.sidebar.button("Select All", key="select_all", use_container_width=True):
+        st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
+        st.rerun()
+with col2:
+    if st.sidebar.button("Deselect All", key="deselect_all", use_container_width=True):
+        st.session_state.selected_points = set()
+        st.rerun()
+
+# Add selection buttons in the sidebar with smaller text
+for location in sorted(entry_traffic['Detection Group'].unique()):
+    is_selected = location in st.session_state.selected_points
+    if st.sidebar.button(
+        f"{'✓ ' if is_selected else ''}{location}",
+        key=f"btn_{location}",
+        type="primary" if is_selected else "secondary",
+        use_container_width=True
+    ):
+        if is_selected:
+            st.session_state.selected_points.remove(location)
+        else:
+            st.session_state.selected_points.add(location)
+        st.rerun()
+
+# Add some spacing after the buttons
+st.sidebar.markdown("---")
+
+# Filter traffic data based on selected points
+filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.session_state.selected_points)]
+
+# Calculate total traffic for selected points only
+selected_total = filtered_traffic['CRZ Entries'].sum()
+filtered_traffic['percentage'] = (filtered_traffic['CRZ Entries'] / selected_total * 100).round(1)
+
 # Map coordinates for the entry points based on Detection Group
 coordinates = {
     "Brooklyn Bridge": (40.7061, -73.9969),
@@ -98,46 +151,11 @@ coordinates = {
     "Hugh L. Carey Tunnel": (40.7017, -74.0132)
 }
 
-# Add select all and deselect all buttons in a row
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("Select All", key="select_all"):
-        st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
-        st.rerun()
-with col2:
-    if st.button("Deselect All", key="deselect_all"):
-        st.session_state.selected_points = set()
-        st.rerun()
-
-# Add selection buttons in a more compact layout
-st.write("Select entry points to focus on:")
-cols = st.columns(6)  # Create 6 columns for more compact layout
-for i, location in enumerate(sorted(entry_traffic['Detection Group'].unique())):
-    col = cols[i % 6]  # Distribute buttons across columns
-    is_selected = location in st.session_state.selected_points
-    if col.button(
-        f"{'✓' if is_selected else ''} {location}",
-        key=f"btn_{location}",
-        type="primary" if is_selected else "secondary"
-    ):
-        if is_selected:
-            st.session_state.selected_points.remove(location)
-        else:
-            st.session_state.selected_points.add(location)
-        st.rerun()
-
-# Filter traffic data based on selected points
-filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.session_state.selected_points)]
-
-# Calculate total traffic for selected points only
-selected_total = filtered_traffic['CRZ Entries'].sum()
-filtered_traffic['percentage'] = (filtered_traffic['CRZ Entries'] / selected_total * 100).round(1)
-
 # Create the map
 fig = go.Figure()
 
 # Central point for Manhattan Congestion Zone
-center_lat, center_lon = 40.7580, -73.9855
+center_lat, center_lon = 40.7380, -73.9855
 
 # Add entry points with arrows pointing to the center
 for _, row in entry_traffic.iterrows():
@@ -171,7 +189,7 @@ for _, row in entry_traffic.iterrows():
 fig.update_layout(
     mapbox=dict(
         style="open-street-map",
-        zoom=10.8,
+        zoom=11,
         center=dict(lat=center_lat, lon=center_lon)
     ),
     margin=dict(l=0, r=0, t=0, b=0),
@@ -282,7 +300,7 @@ for _, row in hourly_entry_traffic.iterrows():
 hourly_fig.update_layout(
     mapbox=dict(
         style="open-street-map",
-        zoom=11.3,
+        zoom=11,
         center=dict(lat=center_lat, lon=center_lon)
     ),
     margin=dict(l=0, r=0, t=0, b=0),
