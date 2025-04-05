@@ -1,26 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Read the first 1000 rows to test
-print("Reading CSV file...")
 df = pd.read_csv("MTA_Congestion_Relief_Zone_Vehicle_Entries__Beginning_2025_20250404.csv", nrows=1000)
 
-# Display basic info about the dataset
-print("\nDataset Sample Info:")
-print(f"Columns: {df.columns.tolist()}")
-print(f"Total rows read: {len(df)}")
-print(f"\nSample data types:")
-print(df.dtypes)
-
-# Print unique values for categorical columns
-print("\nUnique Detection Regions:")
-print(df['Detection Region'].unique())
-
-print("\nUnique Vehicle Classes:")
-print(df['Vehicle Class'].unique())
-
-# Create a simple plot of entries by Detection Region
-print("\nCreating plot...")
 regions = df.groupby('Detection Region')['CRZ Entries'].sum().sort_values(ascending=False)
 plt.figure(figsize=(10, 6))
 regions.plot(kind='bar')
@@ -29,6 +11,18 @@ plt.ylabel('Number of Entries')
 plt.xlabel('Region')
 plt.tight_layout()
 plt.savefig('region_entries.png')
-print("Plot saved as region_entries.png")
 
-print("\nDone!") 
+# Path to the CSV file
+csv_file_path = 'MTA_Congestion_Relief_Zone_Vehicle_Entries__Beginning_2025_20250404.csv'
+
+# Initialize an empty set to store unique detection groups
+unique_detection_groups = set()
+
+# Read the CSV file in chunks
+chunk_size = 10000  # Adjust the chunk size if needed
+for chunk in pd.read_csv(csv_file_path, chunksize=chunk_size):
+    # Add unique entries from the 'Detection Group' column to the set
+    unique_detection_groups.update(chunk['Detection Group'].dropna().unique())
+
+# Output the number of distinct entries
+print(unique_detection_groups)
