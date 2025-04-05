@@ -114,13 +114,13 @@ for _, row in entry_traffic.iterrows():
     lat, lon = coordinates[location]
     
     # Determine marker color based on selection
-    marker_color = 'red' if location in st.session_state.selected_points else 'blue'
+    marker_color = 'green' if location in st.session_state.selected_points else 'darkblue'
     
     # Add the entry point marker
     fig.add_trace(go.Scattermapbox(
         lat=[lat],
         lon=[lon],
-        mode='markers+text',
+        mode='markers',
         marker=dict(size=15, color=marker_color),
         text=[f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"],
         textposition="top center",
@@ -259,24 +259,12 @@ for _, row in hourly_entry_traffic.iterrows():
     # Line width scaled by percentage of traffic
     line_width = 1 + (row['percentage'] / 5)
     
-    # Add the arrow line
-    # hourly_fig.add_trace(go.Scattermapbox(
-    #     lat=[lat, mid_lat],
-    #     lon=[lon, mid_lon],
-    #     mode='lines',
-    #     line=dict(width=line_width, color='blue'),
-    #     name=location,
-    #     text=f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"
-    # ))
-    
     # Add the entry point marker
     hourly_fig.add_trace(go.Scattermapbox(
         lat=[lat],
         lon=[lon],
-        mode='markers+text',
-        marker=dict(size=15, color='blue'),
-        text=[f"{row['percentage']}%"],
-        textposition="top center",
+        mode='markers',
+        marker=dict(size=15, color='darkblue'),
         name=location
     ))
 
