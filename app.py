@@ -95,11 +95,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Entry point selection in sidebar
+if 'selected_points' not in st.session_state:
+    st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
+
 st.sidebar.header("Entry Points")
 st.sidebar.write("Select entry points to focus on:")
 
-# Add select all and deselect all buttons in a row with smaller text
+# Add select all and deselect all buttons
 col1, col2 = st.sidebar.columns(2)
 with col1:
     if st.sidebar.button("Select All", key="select_all", use_container_width=True):
@@ -110,22 +112,17 @@ with col2:
         st.session_state.selected_points = set()
         st.rerun()
 
-# Add selection buttons in the sidebar with smaller text
-for location in sorted(entry_traffic['Detection Group'].unique()):
-    is_selected = location in st.session_state.selected_points
-    if st.sidebar.button(
-        f"{'✓ ' if is_selected else ''}{location}",
-        key=f"btn_{location}",
-        type="primary" if is_selected else "secondary",
-        use_container_width=True
-    ):
-        if is_selected:
-            st.session_state.selected_points.remove(location)
-        else:
-            st.session_state.selected_points.add(location)
-        st.rerun()
+# Use multiselect with the current session state
+selected_points = st.sidebar.multiselect(
+    "Choose entry points:",
+    options=sorted(entry_traffic['Detection Group'].unique()),
+    default=list(st.session_state.selected_points)
+)
 
-# Add some spacing after the buttons
+# Update session state with new selection
+st.session_state.selected_points = set(selected_points)
+
+# Add some spacing after the selection
 st.sidebar.markdown("---")
 
 # Filter traffic data based on selected points
@@ -257,66 +254,77 @@ with summary_col2:
 # st.plotly_chart(fig_vehicle, use_container_width=True)
 
 # Add time animation
+# Add date selector for hourly visualization
+
+
 st.subheader("Traffic Flow Over Time")
 st.write("Use the slider to see how traffic changes throughout the day")
 
-# Create time slider
-selected_hour = st.slider("Hour of day", 0, 23, 8)
-
-# Filter data for the selected hour
-hourly_data = df[
-    (df['date'] == selected_date_range[0]) & 
-    (df['hour'] == selected_hour)
-]
-
-# Group by entry point
-hourly_entry_traffic = hourly_data.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
-hourly_total = hourly_entry_traffic['CRZ Entries'].sum()
-hourly_entry_traffic['percentage'] = (hourly_entry_traffic['CRZ Entries'] / hourly_total * 100).round(1)
-
-# Create hourly map
-hourly_fig = go.Figure()
-
-# Add entry points with arrows pointing to the center
-for _, row in hourly_entry_traffic.iterrows():
-    location = row['Detection Group']
-    
-    # Skip if we don't have coordinates
-    if location not in coordinates:
-        continue
-        
-    lat, lon = coordinates[location]
-    
-    # Calculate arrow path
-    mid_lat = lat + 0.8 * (center_lat - lat)
-    mid_lon = lon + 0.8 * (center_lon - lon)
-    
-    # Line width scaled by percentage of traffic
-    line_width = 1 + (row['percentage'] / 5)
-    
-    # Add the entry point marker
-    hourly_fig.add_trace(go.Scattermapbox(
-        lat=[lat],
-        lon=[lon],
-        mode='markers',
-        marker=dict(
-            size=10 + (row['CRZ Entries'] / hourly_total * 30),  # Scale size based on entries
-            color='darkblue'
-        ),
-        name=location
-    ))
-
-# Update the layout
-hourly_fig.update_layout(
-    mapbox=dict(
-        style="open-street-map",
-        zoom=11,
-        center=dict(lat=center_lat, lon=center_lon)
-    ),
-    margin=dict(l=0, r=0, t=0, b=0),
-    height=600,
-    legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-    title=f"Traffic Flow at {selected_hour}:00"
+selected_date = st.date_input(
+    "Select date for hourly traffic flow",
+    value=selected_date_range[0],
+    min_value=df['date'].min(),
+    max_value=df['date'].max()
 )
 
-st.plotly_chart(hourly_fig, use_container_width=True) 
+# Add this code where you handle the hourly visualization
+
+# Make sure we handle the case when no points are selected
+if not st.session_state.selected_points:
+    st.warning("Please select at least one entry point to see the traffic flow visualization.")
+else:
+    selected_hour = st.slider("Hour of day", 0, 23, 8)
+
+    hourly_data = df[
+        (df['date'] == selected_date) & 
+        (df['hour'] == selected_hour) &
+        (df['Detection Group'].isin(st.session_state.selected_points))
+    ]
+
+    hourly_entry_traffic = hourly_data.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
+    hourly_total = hourly_entry_traffic['CRZ Entries'].sum() if not hourly_entry_traffic.empty else 1  # Avoid division by zero
+    hourly_entry_traffic['percentage'] = (hourly_entry_traffic['CRZ Entries'] / hourly_total * 100).round(1)
+
+    # Create hourly map
+    hourly_fig = go.Figure()
+
+    # Add entry points with markers sized by traffic
+    for _, row in hourly_entry_traffic.iterrows():
+        location = row['Detection Group']
+        
+        # Skip if we don't have coordinates
+        if location not in coordinates:
+            continue
+            
+        lat, lon = coordinates[location]
+        
+        marker_size = 10 + (row['percentage'] * 2)
+        
+        hourly_fig.add_trace(go.Scattermapbox(
+            lat=[lat],
+            lon=[lon],
+            mode='markers+text',
+            marker=dict(
+                size=marker_size,
+                color='darkblue',
+                opacity=0.8
+            ),
+            text=[f"{location}<br>{row['CRZ Entries']} vehicles<br>{row['percentage']}%"],
+            textfont=dict(size=10),
+            textposition="top center",
+            name=location,
+            hoverinfo='text'
+        ))
+
+    hourly_fig.update_layout(
+        mapbox=dict(
+            style="open-street-map",
+            zoom=11,
+            center=dict(lat=center_lat, lon=center_lon)
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=600,
+        title=f"Traffic Flow on {selected_date} at {selected_hour}:00"
+    )
+
+    st.plotly_chart(hourly_fig, use_container_width=True)
