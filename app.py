@@ -49,11 +49,11 @@ st.write(f"Entry locations: {', '.join(sorted(entry_points))}")
 
 # Date and time selection
 st.sidebar.header("Filter Data")
-selected_date = st.sidebar.date_input(
-    "Select date",
+selected_date_range = st.sidebar.date_input(
+    "Select date range",
+    value=(df['date'].min(), df['date'].max()),
     min_value=df['date'].min(),
-    max_value=df['date'].max(),
-    value=df['date'].min()
+    max_value=df['date'].max()
 )
 
 # Time range slider
@@ -64,7 +64,8 @@ time_range = st.sidebar.slider(
 
 # Filter data based on selections
 filtered_df = df[
-    (df['date'] == selected_date) & 
+    (df['date'] >= selected_date_range[0]) & 
+    (df['date'] <= selected_date_range[1]) & 
     (df['hour'] >= time_range[0]) & 
     (df['hour'] <= time_range[1])
 ]
@@ -100,19 +101,19 @@ coordinates = {
 # Add select all and deselect all buttons in a row
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("Select All"):
+    if st.button("Select All", key="select_all"):
         st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
         st.rerun()
 with col2:
-    if st.button("Deselect All"):
+    if st.button("Deselect All", key="deselect_all"):
         st.session_state.selected_points = set()
         st.rerun()
 
 # Add selection buttons in a more compact layout
 st.write("Select entry points to focus on:")
-cols = st.columns(4)  # Create 4 columns
+cols = st.columns(6)  # Create 6 columns for more compact layout
 for i, location in enumerate(sorted(entry_traffic['Detection Group'].unique())):
-    col = cols[i % 4]  # Distribute buttons across columns
+    col = cols[i % 6]  # Distribute buttons across columns
     is_selected = location in st.session_state.selected_points
     if col.button(
         f"{'✓' if is_selected else ''} {location}",
@@ -159,22 +160,22 @@ for _, row in entry_traffic.iterrows():
         lat=[lat],
         lon=[lon],
         mode='markers',
-        marker=dict(size=15, color=marker_color),
-        text=[hover_text],  # Show location and percentage
+        marker=dict(size=12, color=marker_color),  # Reduced marker size
+        text=[hover_text],
         textposition="top center",
         name=location,
-        hoverinfo='text'  # Only show the text on hover
+        hoverinfo='text'
     ))
 
 # Update the layout
 fig.update_layout(
     mapbox=dict(
         style="open-street-map",
-        zoom=11.3,
+        zoom=10.8,
         center=dict(lat=center_lat, lon=center_lon)
     ),
     margin=dict(l=0, r=0, t=0, b=0),
-    height=600,
+    height=400,  # Reduced map height
     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
 )
 
@@ -214,18 +215,18 @@ with summary_col2:
     st.plotly_chart(fig_hourly, use_container_width=True)
 
 # Add vehicle class breakdown
-st.subheader("Traffic by Vehicle Class")
-vehicle_class_traffic = filtered_df.groupby('Vehicle Class')['CRZ Entries'].sum().reset_index()
-vehicle_class_traffic['percentage'] = (vehicle_class_traffic['CRZ Entries'] / vehicle_class_traffic['CRZ Entries'].sum() * 100).round(1)
-vehicle_class_traffic = vehicle_class_traffic.sort_values('CRZ Entries', ascending=False)
+# st.subheader("Traffic by Vehicle Class")
+# vehicle_class_traffic = filtered_df.groupby('Vehicle Class')['CRZ Entries'].sum().reset_index()
+# vehicle_class_traffic['percentage'] = (vehicle_class_traffic['CRZ Entries'] / vehicle_class_traffic['CRZ Entries'].sum() * 100).round(1)
+# vehicle_class_traffic = vehicle_class_traffic.sort_values('CRZ Entries', ascending=False)
 
-fig_vehicle = px.pie(
-    vehicle_class_traffic,
-    values='CRZ Entries',
-    names='Vehicle Class',
-    title='Traffic Distribution by Vehicle Class'
-)
-st.plotly_chart(fig_vehicle, use_container_width=True)
+# fig_vehicle = px.pie(
+#     vehicle_class_traffic,
+#     values='CRZ Entries',
+#     names='Vehicle Class',
+#     title='Traffic Distribution by Vehicle Class'
+# )
+# st.plotly_chart(fig_vehicle, use_container_width=True)
 
 # Add time animation
 st.subheader("Traffic Flow Over Time")
@@ -236,7 +237,7 @@ selected_hour = st.slider("Hour of day", 0, 23, 8)
 
 # Filter data for the selected hour
 hourly_data = df[
-    (df['date'] == selected_date) & 
+    (df['date'] == selected_date_range[0]) & 
     (df['hour'] == selected_hour)
 ]
 
