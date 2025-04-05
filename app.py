@@ -143,6 +143,17 @@ fig.update_layout(
 # Display the map
 st.plotly_chart(fig, use_container_width=True)
 
+# Add select all and deselect all buttons in a row
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Select All"):
+        st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
+        st.rerun()
+with col2:
+    if st.button("Deselect All"):
+        st.session_state.selected_points = set()
+        st.rerun()
+
 # Add selection buttons in a more compact layout
 st.write("Select entry points to focus on:")
 cols = st.columns(4)  # Create 4 columns
