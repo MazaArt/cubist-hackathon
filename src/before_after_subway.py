@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from src.helper import add_congestion_region_overlay
 
 def create_subway_diff_map(df, selected_date, selected_hour):
     """
@@ -76,6 +77,9 @@ def create_before_after_visualization(subway_ridership_diff_df):
 
     # Build the map
     fig = create_subway_diff_map(subway_ridership_diff_df, pd.to_datetime(selected_date), selected_hour)
+
+    fig = add_congestion_region_overlay(fig)
+
     return fig
     
     

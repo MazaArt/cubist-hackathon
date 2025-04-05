@@ -1,7 +1,7 @@
 from plotly.graph_objects import Figure, Scattermapbox, Frame
 import plotly.graph_objects as go
 from src.constants import COORDINATES, CENTER_LON, CENTER_LAT
-from src.helper import traffic_to_color
+from src.helper import traffic_to_color, add_congestion_region_overlay
 
 def create_main_map(entry_traffic, selected_points):
     fig = go.Figure()
@@ -42,6 +42,8 @@ def create_main_map(entry_traffic, selected_points):
         height=400,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
+
+    fig = add_congestion_region_overlay(fig)
     return fig
 
 def create_animation(grouped, max_traffic, min_traffic):
