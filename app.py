@@ -161,7 +161,7 @@ def main():
     # Filter data based on selections
     filtered_df = df[
         (df['date'] >= selected_date_range[0]) & 
-        (df['date'] <= selected_date_range[1]) & 
+        (df['date'] <= selected_date_range[-1]) & 
         (df['hour'] >= time_range[0]) & 
         (df['hour'] <= time_range[1]) &
         (df['Vehicle Class'].isin(selected_vehicle_types))
@@ -233,7 +233,7 @@ def main():
 
         animated_df = df[
             (df['date'] >= selected_date_range[0]) &
-            (df['date'] <= selected_date_range[1]) &
+            (df['date'] <= selected_date_range[-1]) &
             (df['Detection Group'].isin(st.session_state.selected_points))
         ].copy()
 
