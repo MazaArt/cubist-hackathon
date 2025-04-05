@@ -14,12 +14,19 @@ def create_main_map(entry_traffic, selected_points):
         lat, lon = COORDINATES[location]
         marker_color = 'green' if location in selected_points else 'darkblue'
         
+        # Create hover text with percentage for selected points
+        hover_text = location
+        if location in selected_points:
+            entries = row['CRZ Entries']
+            percentage = row['percentage']
+            hover_text = f"{location}<br>{percentage:.1f}%"
+        
         fig.add_trace(go.Scattermapbox(
             lat=[lat],
             lon=[lon],
             mode='markers',
             marker=dict(size=12, color=marker_color),
-            text=[location],
+            text=[hover_text],
             textposition="top center",
             name=location,
             hoverinfo='text'
