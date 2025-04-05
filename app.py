@@ -130,16 +130,16 @@ def main():
             st.session_state.selected_points = set()
             st.rerun()
 
+    last_selected_points = st.session_state.selected_points
     # Update session state with new selection
-    selected_points = st.sidebar.multiselect(
+    st.session_state.selected_points = st.sidebar.multiselect(
         "Choose entry points:",
-        options=available_points,
-        default=list(st.session_state.selected_points),
-        key="entry_points_select"
+        available_points,
+        st.session_state.selected_points
     )
 
-    # Update session state with new selection
-    st.session_state.selected_points = set(selected_points)
+    if last_selected_points != st.session_state.selected_points:
+        st.rerun()
 
     # Add some spacing after the selection
     st.sidebar.markdown("---")
