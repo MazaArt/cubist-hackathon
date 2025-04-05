@@ -114,17 +114,18 @@ for _, row in entry_traffic.iterrows():
         lat=[lat],
         lon=[lon],
         mode='markers+text',
-        marker=dict(size=10, color='blue'),
+        marker=dict(size=15, color='blue'),
         text=[f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"],
         textposition="top center",
-        name=location
+        name=location,
+        hoverinfo='text'  # Only show the text on hover
     ))
 
 # Update the layout
 fig.update_layout(
     mapbox=dict(
         style="open-street-map",
-        zoom=10.5,
+        zoom=11.3,
         center=dict(lat=center_lat, lon=center_lon)
     ),
     margin=dict(l=0, r=0, t=0, b=0),
@@ -241,7 +242,7 @@ for _, row in hourly_entry_traffic.iterrows():
 hourly_fig.update_layout(
     mapbox=dict(
         style="open-street-map",
-        zoom=10.5,
+        zoom=11.3,
         center=dict(lat=center_lat, lon=center_lon)
     ),
     margin=dict(l=0, r=0, t=0, b=0),
