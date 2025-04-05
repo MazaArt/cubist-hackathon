@@ -8,11 +8,12 @@ import os
 import json
 import random
 from plotly.graph_objects import Figure, Scattermapbox, Frame
-from constants import COORDINATES, CENTER_LAT, CENTER_LON, BASE_COLORS
+from src.constants import COORDINATES, CENTER_LAT, CENTER_LON, BASE_COLORS
 import time
-from time_flow import create_traffic_map
-from traffic_summary import create_main_map, create_animation
-from before_after_subway import create_before_after_visualization
+from src.time_flow import create_traffic_map
+from src.traffic_summary import create_main_map, create_animation
+from src.before_after_subway import create_before_after_visualization
+from src.sidebar import render_sidebar
 
 # Page Configuration
 def configure_page():
@@ -84,62 +85,14 @@ def main():
     # Sidebar filters
     st.sidebar.header("Filter Data")
     
-    # Date range selection
-    selected_date_range = st.sidebar.date_input(
-        "Select date range",
-        value=(df['date'].min(), df['date'].max()),
-        min_value=df['date'].min(),
-        max_value=df['date'].max()
-    )
-    
-    # Time range selection
-    time_range = st.sidebar.slider(
-        "Select time range (hours)",
-        0, 23, (0, 23)
-    )
-
-    # Use multiselect with the current session state
-    available_points = sorted(df['Detection Group'].unique())
-    # Initialize session state for selected points if not exists
-    if 'selected_points' not in st.session_state:
-        st.session_state.selected_points = set(available_points)
-
-    # Add custom CSS for smaller buttons
-    st.markdown("""
-        <style>
-        .stButton > button {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.8rem;
-            height: auto;
-            min-height: 1.5rem;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # Entry Points Selection
-    st.sidebar.header("Entry Points")
-
-    # Add select all and deselect all buttons
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        if st.sidebar.button("Select All", key="select_all", use_container_width=True):
-            st.session_state.selected_points = set(available_points)
-            st.rerun()
-    with col2:
-        if st.sidebar.button("Deselect All", key="deselect_all", use_container_width=True):
-            st.session_state.selected_points = set()
-            st.rerun()
-
-    # Update session state with new selection
-    selected_points = st.sidebar.multiselect(
-        "Choose entry points:",
-        options=available_points,
-        default=list(st.session_state.selected_points),
-        key="entry_points_select"
-    )
-
-    # Update session state with new selection
-    st.session_state.selected_points = set(selected_points)
+    (
+        selected_date_range,
+        time_range,
+        selected_points,
+        selected_vehicle_types,
+        filtered_df,
+        entry_traffic
+    ) = render_sidebar(df, COORDINATES)
 
     # Add some spacing after the selection
     st.sidebar.markdown("---")
