@@ -197,6 +197,16 @@ fig.update_layout(
     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
 )
 
+time_flow_tab, before_after_tab = st.tabs(['Time Flow Map', 'Before-After Subway Map'])
+
+with time_flow_tab:
+    # @Will Write your changes here
+    print("TODO")
+    
+with before_after_tab:
+    # my changes
+    print("TODO")
+
 # Display the map
 st.plotly_chart(fig, use_container_width=True)
 
