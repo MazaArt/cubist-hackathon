@@ -26,12 +26,16 @@ def load_data():
     # Extract date and time components
     df['date'] = df['Toll Date'].dt.date
     df['hour'] = df['Hour of Day']
-    return df
+    
+    df_2 = pd.read_csv('data/subway_ridership_diff.csv.gz')
+    df_2['datehour'] = pd.to_datetime(df['datehour'])
+    return df, df_2
+
 
 # Load the data with a progress indicator
 with st.spinner('Loading data... This may take a moment.'):
     try:
-        df = load_data()
+        df, before_after_df = load_data()
     except Exception as e:
         st.error(f"Error loading data: {e}")
         st.stop()
@@ -204,6 +208,7 @@ with time_flow_tab:
     print("TODO")
     
 with before_after_tab:
+    before_after_df
     # my changes
     print("TODO")
 
