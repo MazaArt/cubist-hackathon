@@ -46,7 +46,7 @@ def load_bus_data():
     bus_df = pd.read_csv('data/processed_bus_data.csv.gz')
     bus_df['date'] = pd.to_datetime(bus_df['date']).dt.date
     
-    with open('bus_route_coordinates.json', 'r') as f:
+    with open('data/bus_route_coordinates.json', 'r') as f:
         bus_routes = json.load(f)
         
     return bus_df, bus_routes
@@ -54,7 +54,7 @@ def load_bus_data():
 @st.cache_data
 def load_population_data():
     try:
-        with open('entry_point_populations.json', 'r') as f:
+        with open('data/entry_point_populations.json', 'r') as f:
             return json.load(f)
     except Exception as e:
         st.warning(f"Population data not available. Error: {e}")
