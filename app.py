@@ -169,7 +169,7 @@ def main():
     # Get traffic by detection group
     if len(selected_vehicle_types) == 0:
         st.warning("No vehicle types selected. Please select at least one vehicle type to see traffic data.")
-        entry_traffic = pd.DataFrame({'Detection Group': list(coordinates.keys()), 'CRZ Entries': [0] * len(coordinates)})
+        entry_traffic = pd.DataFrame({'Detection Group': list(COORDINATES.keys()), 'CRZ Entries': [0] * len(COORDINATES)})
     else:
         entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
     # Filter traffic data based on selected points
