@@ -116,50 +116,10 @@ def map_stations_to_ports(subway_stations, coordinates):
     
     return subway_stations
 
-# Sidebar settings
-st.sidebar.header("Filter Data")
-
-# Add toggle for subway station feature
-show_subway_stations = st.sidebar.toggle("Show Subway Stations", value=True)
-
-# Date and time selection
-selected_date = st.sidebar.date_input(
-    "Select date",
-    min_value=None,  # These will be set after loading data
-    max_value=None,
-    value=None
-)
-
-# Time range slider
-time_range = st.sidebar.slider(
-    "Select time range (hours)",
-    0, 23, (0, 23)
-)
-
 # Load the data with a progress indicator
 with st.spinner('Loading data... This may take a moment.'):
     try:
         df = load_data()
-        
-        # Update date picker now that we have the data
-        if selected_date is None:
-            # Update the date picker with actual values from data
-            selected_date = st.sidebar.date_input(
-                "Select date",
-                min_value=df['date'].min(),
-                max_value=df['date'].max(),
-                value=df['date'].min()
-            )
-        
-        # Only load subway data if feature is enabled
-        subway_stations = pd.DataFrame()
-        if show_subway_stations:
-            subway_stations = load_subway_stations()
-            
-            # Map subway stations to nearest port of entry
-            if not subway_stations.empty:
-                subway_stations = map_stations_to_ports(subway_stations, coordinates)
-                
         st.success('Data loaded successfully!')
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -175,19 +135,52 @@ entry_points = df['Detection Region'].unique()
 st.write(f"Entry points: {len(entry_points)}")
 st.write(f"Entry locations: {', '.join(sorted(entry_points))}")
 
+# Date and time selection
+st.sidebar.header("Filter Data")
+
+# Add toggle for subway station feature
+show_subway_stations = st.sidebar.toggle("Show Subway Stations", value=True)
+
+# Only load subway data if feature is enabled
+subway_stations = pd.DataFrame()
+if show_subway_stations:
+    with st.spinner('Loading subway data...'):
+        subway_stations = load_subway_stations()
+        # Map subway stations to nearest port of entry
+        if not subway_stations.empty:
+            subway_stations = map_stations_to_ports(subway_stations, coordinates)
+
+selected_date_range = st.sidebar.date_input(
+    "Select date range",
+    min_value=df['date'].min(),
+    max_value=df['date'].max(),
+    value=(df['date'].min(), df['date'].min()),
+)
+
+# Convert to tuple if it's not already
+if not isinstance(selected_date_range, tuple):
+    selected_date_range = (selected_date_range, selected_date_range)
+
+# Time range slider
+time_range = st.sidebar.slider(
+    "Select time range (hours)",
+    0, 23, (0, 23)
+)
+
+# Initialize session state for selected points if not exists
+if 'selected_points' not in st.session_state:
+    st.session_state.selected_points = set()
+
 # Filter data based on selections
 filtered_df = df[
-    (df['date'] == selected_date) & 
+    (df['date'] >= selected_date_range[0]) & 
+    (df['date'] <= selected_date_range[1]) & 
     (df['hour'] >= time_range[0]) & 
     (df['hour'] <= time_range[1])
 ]
 
 # Create a map of entry points
 st.subheader("Traffic Flow by Entry Point")
-
-# Initialize session state for selected points if not exists
-if 'selected_points' not in st.session_state:
-    st.session_state.selected_points = set()
 
 # Get traffic by detection group
 entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
@@ -210,16 +203,22 @@ for _, row in entry_traffic.iterrows():
         
     lat, lon = coordinates[location]
     
-    # Use the port's color instead of red/blue for consistency
-    marker_color = port_colors[location] if show_subway_stations else ("red" if location in st.session_state.selected_points else "blue")
+    # Determine marker color
+    if show_subway_stations:
+        marker_color = port_colors[location]
+    else:
+        marker_color = 'red' if location in st.session_state.selected_points else 'blue'
+    
+    # Create hover text
+    hover_text = f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"
     
     # Add the entry point marker
-    fig.add_trace(go.Scattermapbox(
+    fig.add_trace(go.Scattermap(
         lat=[lat],
         lon=[lon],
-        mode='markers+text',
-        marker=dict(size=15, color=marker_color),
-        text=[f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"],
+        mode='markers',
+        marker=dict(size=12, color=marker_color),  # Use size from main branch
+        text=[hover_text],
         textposition="top center",
         name=location,
         hoverinfo='text'  # Only show the text on hover
@@ -233,7 +232,7 @@ if show_subway_stations and not subway_stations.empty:
         port_stations = subway_stations[subway_stations['closest_port'] == port]
         
         if not port_stations.empty:
-            fig.add_trace(go.Scattermapbox(
+            fig.add_trace(go.Scattermap(
                 lat=port_stations['latitude'],
                 lon=port_stations['longitude'],
                 mode='markers',
@@ -247,11 +246,11 @@ if show_subway_stations and not subway_stations.empty:
 fig.update_layout(
     mapbox=dict(
         style="open-street-map",
-        zoom=11.3,
+        zoom=10.8,
         center=dict(lat=center_lat, lon=center_lon)
     ),
     margin=dict(l=0, r=0, t=0, b=0),
-    height=600,
+    height=400,
     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
 )
 
@@ -300,8 +299,9 @@ with summary_col1:
     )
 
 with summary_col2:
-    # Traffic volume by hour
-    hourly_traffic = filtered_df.groupby('hour')['CRZ Entries'].sum().reset_index()
+    # Traffic volume by hour - use main branch filtering approach
+    hourly_filtered_df = filtered_df[filtered_df['Detection Group'].isin(st.session_state.selected_points)]
+    hourly_traffic = hourly_filtered_df.groupby('hour')['CRZ Entries'].sum().reset_index()
     fig_hourly = px.line(
         hourly_traffic, 
         x='hour', 
@@ -310,20 +310,6 @@ with summary_col2:
         labels={'hour': 'Hour of Day', 'CRZ Entries': 'Number of Vehicles'}
     )
     st.plotly_chart(fig_hourly, use_container_width=True)
-
-# Add vehicle class breakdown
-st.subheader("Traffic by Vehicle Class")
-vehicle_class_traffic = filtered_df.groupby('Vehicle Class')['CRZ Entries'].sum().reset_index()
-vehicle_class_traffic['percentage'] = (vehicle_class_traffic['CRZ Entries'] / vehicle_class_traffic['CRZ Entries'].sum() * 100).round(1)
-vehicle_class_traffic = vehicle_class_traffic.sort_values('CRZ Entries', ascending=False)
-
-fig_vehicle = px.pie(
-    vehicle_class_traffic,
-    values='CRZ Entries',
-    names='Vehicle Class',
-    title='Traffic Distribution by Vehicle Class'
-)
-st.plotly_chart(fig_vehicle, use_container_width=True)
 
 # Add time animation
 st.subheader("Traffic Flow Over Time")
@@ -334,7 +320,7 @@ selected_hour = st.slider("Hour of day", 0, 23, 8)
 
 # Filter data for the selected hour
 hourly_data = df[
-    (df['date'] == selected_date) & 
+    (df['date'] == selected_date_range[0]) &  # Use the first selected date
     (df['hour'] == selected_hour)
 ]
 
@@ -360,7 +346,7 @@ for _, row in hourly_entry_traffic.iterrows():
     marker_color = port_colors[location] if show_subway_stations else "blue"
     
     # Add the entry point marker
-    hourly_fig.add_trace(go.Scattermapbox(
+    hourly_fig.add_trace(go.Scattermap(
         lat=[lat],
         lon=[lon],
         mode='markers+text',
@@ -442,7 +428,7 @@ if show_subway_stations and not subway_stations.empty:
         station_map = go.Figure()
         
         # Add the station
-        station_map.add_trace(go.Scattermapbox(
+        station_map.add_trace(go.Scattermap(
             lat=[station_data['latitude'].values[0]],
             lon=[station_data['longitude'].values[0]],
             mode='markers',
@@ -455,7 +441,7 @@ if show_subway_stations and not subway_stations.empty:
         port_name = station_data['closest_port'].values[0]
         port_lat, port_lon = coordinates[port_name]
         
-        station_map.add_trace(go.Scattermapbox(
+        station_map.add_trace(go.Scattermap(
             lat=[port_lat],
             lon=[port_lon],
             mode='markers',
@@ -465,7 +451,7 @@ if show_subway_stations and not subway_stations.empty:
         ))
         
         # Add a line connecting them
-        station_map.add_trace(go.Scattermapbox(
+        station_map.add_trace(go.Scattermap(
             lat=[station_data['latitude'].values[0], port_lat],
             lon=[station_data['longitude'].values[0], port_lon],
             mode='lines',
