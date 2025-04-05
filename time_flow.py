@@ -4,6 +4,7 @@ from helper import haversine_distance
 import plotly.graph_objects as go
 import streamlit as st
 import numpy as np
+from helper import add_congestion_region_overlay
 
 def create_traffic_map(entry_traffic, selected_points, rideshare_df, bus_df, bus_routes, population_data, selected_date, selected_hour):
     """Create the interactive traffic map visualization with subway, bus, and population data"""
@@ -259,5 +260,7 @@ def create_traffic_map(entry_traffic, selected_points, rideshare_df, bus_df, bus
         ),
         title=f"Traffic at {selected_date} {selected_hour:02d}:00"
     )
+    
+    traffic_map = add_congestion_region_overlay(traffic_map)
     
     return traffic_map
