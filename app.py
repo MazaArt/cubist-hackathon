@@ -34,7 +34,7 @@ st.set_page_config(
 st.title("MTA Congestion Relief Zone Traffic Flow")
 st.markdown("Visualizing traffic flow into the Congestion Relief Zone by entry points")
 
-# Load the data
+# Load the traffic data
 @st.cache_data
 def load_data():
     df = pd.read_csv("MTA_Congestion_Relief_Zone_Vehicle_Entries__Beginning_2025_20250404.csv")
@@ -116,16 +116,50 @@ def map_stations_to_ports(subway_stations, coordinates):
     
     return subway_stations
 
+# Sidebar settings
+st.sidebar.header("Filter Data")
+
+# Add toggle for subway station feature
+show_subway_stations = st.sidebar.toggle("Show Subway Stations", value=True)
+
+# Date and time selection
+selected_date = st.sidebar.date_input(
+    "Select date",
+    min_value=None,  # These will be set after loading data
+    max_value=None,
+    value=None
+)
+
+# Time range slider
+time_range = st.sidebar.slider(
+    "Select time range (hours)",
+    0, 23, (0, 23)
+)
+
 # Load the data with a progress indicator
 with st.spinner('Loading data... This may take a moment.'):
     try:
         df = load_data()
-        subway_stations = load_subway_stations()
         
-        # Map subway stations to nearest port of entry
-        if not subway_stations.empty:
-            subway_stations = map_stations_to_ports(subway_stations, coordinates)
+        # Update date picker now that we have the data
+        if selected_date is None:
+            # Update the date picker with actual values from data
+            selected_date = st.sidebar.date_input(
+                "Select date",
+                min_value=df['date'].min(),
+                max_value=df['date'].max(),
+                value=df['date'].min()
+            )
+        
+        # Only load subway data if feature is enabled
+        subway_stations = pd.DataFrame()
+        if show_subway_stations:
+            subway_stations = load_subway_stations()
             
+            # Map subway stations to nearest port of entry
+            if not subway_stations.empty:
+                subway_stations = map_stations_to_ports(subway_stations, coordinates)
+                
         st.success('Data loaded successfully!')
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -140,21 +174,6 @@ st.write(f"Date range: {df['date'].min()} to {df['date'].max()}")
 entry_points = df['Detection Region'].unique()
 st.write(f"Entry points: {len(entry_points)}")
 st.write(f"Entry locations: {', '.join(sorted(entry_points))}")
-
-# Date and time selection
-st.sidebar.header("Filter Data")
-selected_date = st.sidebar.date_input(
-    "Select date",
-    min_value=df['date'].min(),
-    max_value=df['date'].max(),
-    value=df['date'].min()
-)
-
-# Time range slider
-time_range = st.sidebar.slider(
-    "Select time range (hours)",
-    0, 23, (0, 23)
-)
 
 # Filter data based on selections
 filtered_df = df[
@@ -192,7 +211,7 @@ for _, row in entry_traffic.iterrows():
     lat, lon = coordinates[location]
     
     # Use the port's color instead of red/blue for consistency
-    marker_color = port_colors[location]
+    marker_color = port_colors[location] if show_subway_stations else ("red" if location in st.session_state.selected_points else "blue")
     
     # Add the entry point marker
     fig.add_trace(go.Scattermapbox(
@@ -206,8 +225,8 @@ for _, row in entry_traffic.iterrows():
         hoverinfo='text'  # Only show the text on hover
     ))
 
-# Add subway stations to the map
-if not subway_stations.empty:
+# Add subway stations to the map if feature is enabled
+if show_subway_stations and not subway_stations.empty:
     # For each port of entry, add its subway stations with matching color
     for port in coordinates.keys():
         # Filter stations for this port
@@ -337,8 +356,8 @@ for _, row in hourly_entry_traffic.iterrows():
         
     lat, lon = coordinates[location]
     
-    # Use the port's color instead of red/blue for consistency
-    marker_color = port_colors[location]
+    # Use the port's color if subway feature is enabled, otherwise use blue
+    marker_color = port_colors[location] if show_subway_stations else "blue"
     
     # Add the entry point marker
     hourly_fig.add_trace(go.Scattermapbox(
@@ -366,8 +385,8 @@ hourly_fig.update_layout(
 
 st.plotly_chart(hourly_fig, use_container_width=True)
 
-# Add subway station information section
-if not subway_stations.empty:
+# Add subway station information section (only if feature is enabled)
+if show_subway_stations and not subway_stations.empty:
     st.subheader("Subway Stations")
     
     # Summary of stations by nearest port of entry
