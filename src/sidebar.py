@@ -60,10 +60,10 @@ def render_sidebar(df):
             st.session_state.selected_points = set(available_points)
             st.experimental_rerun()
 
-    with col2:
-        if st.sidebar.button("Deselect All", key="deselect_all", use_container_width=True):
-            st.session_state.selected_points = set()
-            st.experimental_rerun()
+    # with col2:
+    #     if st.sidebar.button("Deselect All", key="deselect_all", use_container_width=True):
+    #         st.session_state.selected_points = set()
+    #         st.experimental_rerun()
 
     # Multi-select for entry points
     selected_points = st.sidebar.multiselect(
