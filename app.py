@@ -12,6 +12,7 @@ from constants import COORDINATES, CENTER_LAT, CENTER_LON, BASE_COLORS
 import time
 from time_flow import create_traffic_map
 from traffic_summary import create_main_map, create_animation
+from before_after_subway import create_before_after_visualization
 
 # Page Configuration
 def configure_page():
@@ -50,6 +51,12 @@ def load_bus_data():
         bus_routes = json.load(f)
         
     return bus_df, bus_routes
+
+@st.cache_data
+def load_subway_diff_data():
+    df = pd.read_csv('data/subway_ridership_diff.csv.gz')
+    df["datehour"] = pd.to_datetime(df["datehour"])
+    return df
 
 @st.cache_data
 def load_population_data():
@@ -270,7 +277,7 @@ def main():
                 # Animate
                 if st.session_state.animating:
                     st.session_state.current_hour = (st.session_state.current_hour + 1) % 24
-                    time.sleep(1)
+                    time.sleep(.5)
                     st.rerun()
 
                 pass
@@ -279,7 +286,10 @@ def main():
             st.error(f"Error processing rideshare data: {e}")
     
     with before_after_tab:
-        st.write("TODO: Before-After Subway Map implementation")
+        with st.spinner('Loading additional data...'):
+            subway_ridership_diff_df = load_subway_diff_data()
+            before_after_map = create_before_after_visualization(subway_ridership_diff_df)
+            st.plotly_chart(before_after_map, use_container_width=True)
 
 if __name__ == "__main__":
     main()
