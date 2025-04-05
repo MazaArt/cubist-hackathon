@@ -5,16 +5,28 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime, timedelta
 
+# Map coordinates for the entry points based on Detection Group
+coordinates = {
+    "Brooklyn Bridge": (40.7061, -73.9969),
+    "West Side Highway at 60th St": (40.7714, -73.9900),
+    "West 60th St": (40.7700, -73.9850),
+    "Queensboro Bridge": (40.7553, -73.9500),
+    "Queens Midtown Tunnel": (40.7407, -73.9711),
+    "Lincoln Tunnel": (40.7570, -74.0027),
+    "Holland Tunnel": (40.7270, -74.0119),
+    "FDR Drive at 60th St": (40.7600, -73.9580),
+    "East 60th St": (40.7610, -73.9630),
+    "Williamsburg Bridge": (40.7117, -73.970),
+    "Manhattan Bridge": (40.7075, -73.9903),
+    "Hugh L. Carey Tunnel": (40.7017, -74.0132)
+}
+
 # Set page config
 st.set_page_config(
     page_title="MTA Congestion Relief Zone Traffic Visualization",
     page_icon="🚗",
     layout="wide"
 )
-
-# Page title
-st.title("MTA Congestion Relief Zone Traffic Flow")
-st.markdown("Visualizing traffic flow into the Congestion Relief Zone by entry points")
 
 # Load the data
 @st.cache_data
@@ -30,6 +42,48 @@ def load_data():
     df_2 = pd.read_csv('data/subway_ridership_diff.csv.gz')
     df_2['datehour'] = pd.to_datetime(df['datehour'])
     return df, df_2
+
+# Load subway station data
+@st.cache_data
+def load_subway_stations():
+    try:
+        subway_df = pd.read_csv("subway_stations.csv")
+        return subway_df
+    except Exception as e:
+        st.error(f"Error loading subway data: {e}")
+        return pd.DataFrame()
+
+@st.cache_data
+def map_stations_to_ports(subway_stations, coordinates):
+    # Create a new column to store the closest port
+    subway_stations = subway_stations.copy()
+    subway_stations['closest_port'] = ""
+    subway_stations['distance_km'] = 0.0
+    
+    # For each station, find the closest port
+    for idx, station in subway_stations.iterrows():
+        min_distance = float('inf')
+        closest_port = ""
+        
+        for port, (port_lat, port_lon) in coordinates.items():
+            distance = haversine_distance(
+                station['latitude'], station['longitude'],
+                port_lat, port_lon
+            )
+            
+            if distance < min_distance:
+                min_distance = distance
+                closest_port = port
+        
+        subway_stations.at[idx, 'closest_port'] = closest_port
+        subway_stations.at[idx, 'distance_km'] = min_distance
+    
+    return subway_stations
+
+
+# Page title
+st.title("MTA Congestion Relief Zone Traffic Flow")
+st.markdown("Visualizing traffic flow into the Congestion Relief Zone by entry points")
 
 
 # Load the data with a progress indicator
@@ -139,21 +193,6 @@ filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.sessio
 selected_total = filtered_traffic['CRZ Entries'].sum()
 filtered_traffic['percentage'] = (filtered_traffic['CRZ Entries'] / selected_total * 100).round(1)
 
-# Map coordinates for the entry points based on Detection Group
-coordinates = {
-    "Brooklyn Bridge": (40.7061, -73.9969),
-    "West Side Highway at 60th St": (40.7714, -73.9900),
-    "West 60th St": (40.7700, -73.9850),
-    "Queensboro Bridge": (40.7553, -73.9500),
-    "Queens Midtown Tunnel": (40.7407, -73.9711),
-    "Lincoln Tunnel": (40.7570, -74.0027),
-    "Holland Tunnel": (40.7270, -74.0119),
-    "FDR Drive at 60th St": (40.7600, -73.9580),
-    "East 60th St": (40.7610, -73.9630),
-    "Williamsburg Bridge": (40.7117, -73.970),
-    "Manhattan Bridge": (40.7075, -73.9903),
-    "Hugh L. Carey Tunnel": (40.7017, -74.0132)
-}
 
 # Create the map
 fig = go.Figure()
