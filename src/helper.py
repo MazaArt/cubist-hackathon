@@ -13,3 +13,35 @@ def traffic_to_color(value, min_val, max_val):
     r = int(255 * scale)
     g = int(255 * (1 - scale))
     return f'rgb({r},{g},0)'
+
+import plotly.graph_objects as go
+from src.constants import REGION_BOUNDARY
+ 
+def add_congestion_region_overlay(fig, fill_color='rgba(255, 0, 0, 0.2)', line_color='red', line_width=2):
+    points = list(REGION_BOUNDARY.values())
+ 
+    lats = [p[0] for p in points]
+    lons = [p[1] for p in points]
+     
+    lats.append(lats[0])
+    lons.append(lons[0])
+    
+    new_fig = go.Figure()
+    
+    new_fig.add_trace(go.Scattermapbox(
+        lat=lats,
+        lon=lons,
+        mode='lines',
+        line=dict(width=line_width, color=line_color),
+        fill='toself',
+        fillcolor=fill_color,
+        name='Congestion Relief Region',
+        hoverinfo='none'
+    ))
+    
+    for trace in fig.data:
+        new_fig.add_trace(trace)
+    
+    new_fig.update_layout(fig.layout)
+    
+    return new_fig 
