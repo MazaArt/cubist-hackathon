@@ -72,7 +72,7 @@ filtered_df = df[
 # Create a map of entry points
 st.subheader("Traffic Flow by Entry Point")
 
-# Map coordinates for the entry points based on Detection Region
+# Map coordinates for the entry points based on Detection Group
 coordinates = {
     "Brooklyn": (40.6782, -73.9442),
     "West Side Highway": (40.7713, -73.9971),
@@ -83,8 +83,8 @@ coordinates = {
     "East 60th St": (40.7615, -73.9656)
 }
 
-# Get traffic by entry point
-entry_traffic = filtered_df.groupby('Detection Region')['CRZ Entries'].sum().reset_index()
+# Get traffic by detection group
+entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
 total_traffic = entry_traffic['CRZ Entries'].sum()
 entry_traffic['percentage'] = (entry_traffic['CRZ Entries'] / total_traffic * 100).round(1)
 
@@ -94,19 +94,9 @@ fig = go.Figure()
 # Central point for Manhattan Congestion Zone
 center_lat, center_lon = 40.7580, -73.9855
 
-# Add the central zone
-fig.add_trace(go.Scattermapbox(
-    lat=[center_lat],
-    lon=[center_lon],
-    mode='markers',
-    marker=dict(size=30, color='red', opacity=0.5),
-    text=["Manhattan Congestion Zone"],
-    name="Congestion Zone"
-))
-
 # Add entry points with arrows pointing to the center
 for _, row in entry_traffic.iterrows():
-    location = row['Detection Region']
+    location = row['Detection Group']
     
     # Skip if we don't have coordinates
     if location not in coordinates:
@@ -164,11 +154,11 @@ summary_col1, summary_col2 = st.columns(2)
 with summary_col1:
     st.metric("Total Traffic", f"{total_traffic:,} vehicles")
     
-    # Display traffic by entry point
+    # Display traffic by detection group
     st.dataframe(
         entry_traffic.sort_values('CRZ Entries', ascending=False),
         column_config={
-            'Detection Region': 'Entry Point',
+            'Detection Group': 'Entry Point',
             'CRZ Entries': 'Traffic Volume',
             'percentage': 'Percentage (%)'
         },
@@ -215,26 +205,16 @@ hourly_data = df[
 ]
 
 # Group by entry point
-hourly_entry_traffic = hourly_data.groupby('Detection Region')['CRZ Entries'].sum().reset_index()
+hourly_entry_traffic = hourly_data.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
 hourly_total = hourly_entry_traffic['CRZ Entries'].sum()
 hourly_entry_traffic['percentage'] = (hourly_entry_traffic['CRZ Entries'] / hourly_total * 100).round(1)
 
 # Create hourly map
 hourly_fig = go.Figure()
 
-# Add the central zone
-hourly_fig.add_trace(go.Scattermapbox(
-    lat=[center_lat],
-    lon=[center_lon],
-    mode='markers',
-    marker=dict(size=30, color='red', opacity=0.5),
-    text=[f"Manhattan Congestion Zone<br>Total: {hourly_total:,} vehicles at {selected_hour}:00"],
-    name="Congestion Zone"
-))
-
 # Add entry points with arrows pointing to the center
 for _, row in hourly_entry_traffic.iterrows():
-    location = row['Detection Region']
+    location = row['Detection Group']
     
     # Skip if we don't have coordinates
     if location not in coordinates:
