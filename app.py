@@ -83,7 +83,7 @@ coordinates = {
     "Holland Tunnel": (40.7270, -74.0119),
     "FDR Drive at 60th St": (40.7600, -73.9580),
     "East 60th St": (40.7610, -73.9630),
-    "Williamsburg Bridge": (40.7101, -73.9712),
+    "Williamsburg Bridge": (40.7117, -73.970),
     "Manhattan Bridge": (40.7075, -73.9903),
     "Hugh L. Carey Tunnel": (40.7017, -74.0132)
 }
@@ -217,14 +217,14 @@ for _, row in hourly_entry_traffic.iterrows():
     line_width = 1 + (row['percentage'] / 5)
     
     # Add the arrow line
-    hourly_fig.add_trace(go.Scattermapbox(
-        lat=[lat, mid_lat],
-        lon=[lon, mid_lon],
-        mode='lines',
-        line=dict(width=line_width, color='blue'),
-        name=location,
-        text=f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"
-    ))
+    # hourly_fig.add_trace(go.Scattermapbox(
+    #     lat=[lat, mid_lat],
+    #     lon=[lon, mid_lon],
+    #     mode='lines',
+    #     line=dict(width=line_width, color='blue'),
+    #     name=location,
+    #     text=f"{location}: {row['percentage']}% ({row['CRZ Entries']:,} entries)"
+    # ))
     
     # Add the entry point marker
     hourly_fig.add_trace(go.Scattermapbox(
