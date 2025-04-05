@@ -209,7 +209,10 @@ fig.update_layout(
     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
 )
 
-time_flow_tab, before_after_tab = st.tabs(['Time Flow Map', 'Before-After Subway Map'])
+origin, time_flow_tab, before_after_tab = st.tabs(['Time Flow Map', 'Time Flow Map With Subway and Bus', 'Before-After Subway Map'])
+
+with origin:
+    pass
 
 with time_flow_tab:
     # Read the processed rideshare data
@@ -417,7 +420,7 @@ with time_flow_tab:
                 # Add display toggles
                 toggle_col1, toggle_col2, toggle_col3 = st.columns(3)
                 with toggle_col1:
-                    show_regions = st.checkbox("Show Entry Point Regions", value=False)
+                    show_regions = st.checkbox("Show Entry Point Regions", value=True)
                 with toggle_col2:
                     show_subway = st.checkbox("Show Subway Stations", value=True)
                 with toggle_col3:
