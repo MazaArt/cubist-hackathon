@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from helper import haversine_distance
 from sidebar import create_sidebar
 from nyc_map import create_map
-from constants import coordinates
+from constants import COORDINATES, CENTER_LON, CENTER_LAT
 
 
 # Set page config
@@ -29,7 +29,7 @@ def load_data():
     df['hour'] = df['Hour of Day']
     
     df_2 = pd.read_csv('data/subway_ridership_diff.csv.gz')
-    df_2['datehour'] = pd.to_datetime(df['datehour'])
+    df_2['datehour'] = pd.to_datetime(df_2['datehour'])
     return df, df_2
 
 # Load subway station data
@@ -43,7 +43,7 @@ def load_subway_stations():
         return pd.DataFrame()
 
 @st.cache_data
-def map_stations_to_ports(subway_stations, coordinates):
+def map_stations_to_ports(subway_stations):
     # Create a new column to store the closest port
     subway_stations = subway_stations.copy()
     subway_stations['closest_port'] = ""
@@ -54,7 +54,7 @@ def map_stations_to_ports(subway_stations, coordinates):
         min_distance = float('inf')
         closest_port = ""
         
-        for port, (port_lat, port_lon) in coordinates.items():
+        for port, (port_lat, port_lon) in COORDINATES.items():
             distance = haversine_distance(
                 station['latitude'], station['longitude'],
                 port_lat, port_lon
@@ -192,14 +192,14 @@ for _, row in hourly_entry_traffic.iterrows():
     location = row['Detection Group']
     
     # Skip if we don't have coordinates
-    if location not in coordinates:
+    if location not in COORDINATES:
         continue
         
-    lat, lon = coordinates[location]
+    lat, lon = COORDINATES[location]
     
     # Calculate arrow path
-    mid_lat = lat + 0.8 * (center_lat - lat)
-    mid_lon = lon + 0.8 * (center_lon - lon)
+    mid_lat = lat + 0.8 * (CENTER_LAT - lat)
+    mid_lon = lon + 0.8 * (CENTER_LON - lon)
     
     # Line width scaled by percentage of traffic
     line_width = 1 + (row['percentage'] / 5)
@@ -221,7 +221,7 @@ hourly_fig.update_layout(
     mapbox=dict(
         style="open-street-map",
         zoom=11,
-        center=dict(lat=center_lat, lon=center_lon)
+        center=dict(lat=CENTER_LAT, lon=CENTER_LON)
     ),
     margin=dict(l=0, r=0, t=0, b=0),
     height=600,

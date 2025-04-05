@@ -1,5 +1,5 @@
 # Map coordinates for the entry points based on Detection Group
-coordinates = {
+COORDINATES = {
     "Brooklyn Bridge": (40.7061, -73.9969),
     "West Side Highway at 60th St": (40.7714, -73.9900),
     "West 60th St": (40.7700, -73.9850),
@@ -13,3 +13,6 @@ coordinates = {
     "Manhattan Bridge": (40.7075, -73.9903),
     "Hugh L. Carey Tunnel": (40.7017, -74.0132)
 }
+
+# Central point for Manhattan Congestion Zone
+CENTER_LAT, CENTER_LON = 40.7580, -73.9855
