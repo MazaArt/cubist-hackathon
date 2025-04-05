@@ -97,36 +97,32 @@ st.markdown("""
 
 # Entry point selection in sidebar
 st.sidebar.header("Entry Points")
-st.sidebar.write("Select entry points to focus on:")
+st.sidebar.write("Filter the entry points shown on the map and charts.")
+st.sidebar.markdown("---")
+
+# Multiselect instead of individual buttons
+all_locations = sorted(entry_traffic['Detection Group'].unique())
+selected = st.sidebar.multiselect(
+    "Choose entry points:",
+    options=all_locations,
+    default=list(st.session_state.selected_points)
+)
+
+# Update session state
+st.session_state.selected_points = set(selected)
 
 # Add select all and deselect all buttons in a row with smaller text
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    if st.sidebar.button("Select All", key="select_all", use_container_width=True):
-        st.session_state.selected_points = set(entry_traffic['Detection Group'].unique())
+    if st.button("Select All", use_container_width=True):
+        st.session_state.selected_points = set(all_locations)
         st.rerun()
 with col2:
-    if st.sidebar.button("Deselect All", key="deselect_all", use_container_width=True):
+    if st.button("Deselect All", use_container_width=True):
         st.session_state.selected_points = set()
         st.rerun()
 
-# Add selection buttons in the sidebar with smaller text
-for location in sorted(entry_traffic['Detection Group'].unique()):
-    is_selected = location in st.session_state.selected_points
-    if st.sidebar.button(
-        f"{'✓ ' if is_selected else ''}{location}",
-        key=f"btn_{location}",
-        type="primary" if is_selected else "secondary",
-        use_container_width=True
-    ):
-        if is_selected:
-            st.session_state.selected_points.remove(location)
-        else:
-            st.session_state.selected_points.add(location)
-        st.rerun()
 
-# Add some spacing after the buttons
-st.sidebar.markdown("---")
 
 # Filter traffic data based on selected points
 filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.session_state.selected_points)]
@@ -256,67 +252,160 @@ with summary_col2:
 # )
 # st.plotly_chart(fig_vehicle, use_container_width=True)
 
-# Add time animation
-st.subheader("Traffic Flow Over Time")
-st.write("Use the slider to see how traffic changes throughout the day")
+st.subheader("Animated Traffic Flow Over Time")
+st.markdown("Visualize how traffic volume at each entry point evolves across days and hours.")
 
-# Create time slider
-selected_hour = st.slider("Hour of day", 0, 23, 8)
+# 🚧 Handle empty selection
+if not st.session_state.selected_points:
+    st.warning("No entry points selected. Please choose one or more from the sidebar to see traffic animation.")
+    st.stop()  # Or skip this block entirely
 
-# Filter data for the selected hour
-hourly_data = df[
-    (df['date'] == selected_date_range[0]) & 
-    (df['hour'] == selected_hour)
-]
+# Filter to selected date range and selected entry points
+animated_df = df[
+    (df['date'] >= selected_date_range[0]) &
+    (df['date'] <= selected_date_range[1]) &
+    (df['Detection Group'].isin(st.session_state.selected_points))
+].copy()
 
-# Group by entry point
-hourly_entry_traffic = hourly_data.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
-hourly_total = hourly_entry_traffic['CRZ Entries'].sum()
-hourly_entry_traffic['percentage'] = (hourly_entry_traffic['CRZ Entries'] / hourly_total * 100).round(1)
+# Add coordinates
+animated_df['lat'] = animated_df['Detection Group'].map(lambda x: coordinates.get(x, (None, None))[0])
+animated_df['lon'] = animated_df['Detection Group'].map(lambda x: coordinates.get(x, (None, None))[1])
+animated_df.dropna(subset=['lat', 'lon'], inplace=True)
 
-# Create hourly map
-hourly_fig = go.Figure()
+# Combine date and hour into one animation timestamp
+animated_df['timestamp'] = animated_df['Toll Hour'].dt.strftime('%Y-%m-%d %H:%M')
 
-# Add entry points with arrows pointing to the center
-for _, row in hourly_entry_traffic.iterrows():
-    location = row['Detection Group']
-    
-    # Skip if we don't have coordinates
-    if location not in coordinates:
-        continue
-        
-    lat, lon = coordinates[location]
-    
-    # Calculate arrow path
-    mid_lat = lat + 0.8 * (center_lat - lat)
-    mid_lon = lon + 0.8 * (center_lon - lon)
-    
-    # Line width scaled by percentage of traffic
-    line_width = 1 + (row['percentage'] / 5)
-    
-    # Add the entry point marker
-    hourly_fig.add_trace(go.Scattermapbox(
-        lat=[lat],
-        lon=[lon],
-        mode='markers',
-        marker=dict(
-            size=10 + (row['CRZ Entries'] / hourly_total * 30),  # Scale size based on entries
-            color='darkblue'
-        ),
-        name=location
-    ))
-
-# Update the layout
-hourly_fig.update_layout(
-    mapbox=dict(
-        style="open-street-map",
-        zoom=11,
-        center=dict(lat=center_lat, lon=center_lon)
-    ),
-    margin=dict(l=0, r=0, t=0, b=0),
-    height=600,
-    legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-    title=f"Traffic Flow at {selected_hour}:00"
+# Group by timestamp and entry point
+grouped = (
+    animated_df
+    .groupby(['timestamp', 'Detection Group', 'lat', 'lon'], as_index=False)['CRZ Entries']
+    .sum()
 )
 
-st.plotly_chart(hourly_fig, use_container_width=True) 
+# Normalize CRZ Entries for manual color mapping
+max_traffic = grouped['CRZ Entries'].max()
+min_traffic = grouped['CRZ Entries'].min()
+
+# Map traffic to color: green (low) to red (high)
+def traffic_to_color(value):
+    scale = (value - min_traffic) / (max_traffic - min_traffic + 1e-5)
+    r = int(255 * scale)
+    g = int(255 * (1 - scale))
+    return f'rgb({r},{g},0)'
+
+grouped['color'] = grouped['CRZ Entries'].apply(traffic_to_color)
+
+# Build animation using go.Figure for full color control
+from plotly.graph_objects import Figure, Scattermapbox, Frame
+
+frames = []
+timestamps = grouped['timestamp'].unique()
+
+# Initialize figure
+initial_data = grouped[grouped['timestamp'] == timestamps[0]]
+fig = Figure(
+    data=[
+        Scattermapbox(
+            lat=initial_data['lat'],
+            lon=initial_data['lon'],
+            mode='markers',
+            marker=dict(
+                size=initial_data['CRZ Entries'] / max_traffic * 25 + 8,
+                color=initial_data['color'],
+                opacity=0.8
+            ),
+            text=initial_data.apply(
+                lambda row: f"{row['Detection Group']}<br>Traffic: {row['CRZ Entries']:,}", axis=1
+            ),
+            hoverinfo='text'
+        )
+    ],
+    layout=dict(
+        mapbox=dict(
+            style="open-street-map",  # or dynamic `mapbox_style`
+            zoom=11,
+            center=dict(lat=center_lat, lon=center_lon)
+        ),
+        margin=dict(l=0, r=0, t=40, b=0),
+        height=600,
+        title="Animated Traffic Flow Over Time",
+        showlegend=False,
+
+        # 🎮 Play/Pause buttons — move them higher (y=0.15)
+        updatemenus=[{
+            "buttons": [
+                {
+                    "args": [None, {"frame": {"duration": 500, "redraw": True}, "fromcurrent": True}],
+                    "label": "▶️",
+                    "method": "animate"
+                },
+                {
+                    "args": [[None], {"mode": "immediate", "frame": {"duration": 0}, "transition": {"duration": 0}}],
+                    "label": "⏸",
+                    "method": "animate"
+                }
+            ],
+            "type": "buttons",
+            "direction": "left",
+            "pad": {"r": 10, "t": 30},  # top padding between button and plot
+            "x": 0,
+            "xanchor": "left",
+            "y": 0,  # moved slightly above the slider
+            "yanchor": "top"
+        }],
+
+        # 🕓 Slider — keep it lower (y=0)
+        sliders=[{
+            "active": 0,
+            "yanchor": "top",
+            "xanchor": "left",
+            "currentvalue": {
+                "font": {"size": 14},
+                "prefix": "Time: ",
+                "visible": True,
+                "xanchor": "right"
+            },
+            "transition": {"duration": 300, "easing": "cubic-in-out"},
+            "pad": {"b": 10, "t": 10},
+            "len": 0.9,
+            "x": 0.1,
+            "y": 0,  # keep at bottom
+            "steps": [
+                {
+                    "args": [[t], {"frame": {"duration": 300, "redraw": True}, "mode": "immediate"}],
+                    "label": t,
+                    "method": "animate"
+                } for t in timestamps
+            ]
+        }]
+)
+
+)
+
+# Add frames for animation
+for t in timestamps:
+    frame_data = grouped[grouped['timestamp'] == t]
+    frames.append(Frame(
+        data=[
+            Scattermapbox(
+                lat=frame_data['lat'],
+                lon=frame_data['lon'],
+                mode='markers',
+                marker=dict(
+                    size=frame_data['CRZ Entries'] / max_traffic * 25 + 8,
+                    color=frame_data['color'],
+                    opacity=0.8
+                ),
+                text=frame_data.apply(
+                    lambda row: f"{row['Detection Group']}<br>Traffic: {row['CRZ Entries']:,}", axis=1
+                ),
+                hoverinfo='text'
+            )
+        ],
+        name=t
+    ))
+
+fig.frames = frames
+
+# Show animated chart
+st.plotly_chart(fig, use_container_width=True)
