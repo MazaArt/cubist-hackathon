@@ -92,36 +92,11 @@ def main():
         selected_vehicle_types,
         filtered_df,
         entry_traffic
-    ) = render_sidebar(df, COORDINATES)
+    ) = render_sidebar(df)
 
     # Add some spacing after the selection
     st.sidebar.markdown("---")
 
-    # Vehicle Types Selection
-    st.sidebar.header("Vehicle Types")
-    selected_vehicle_types = []
-
-    for vehicle_type in vehicle_types:
-        if st.sidebar.checkbox(vehicle_type, value=True, key=f"vehicle_type_{vehicle_type}"):
-            selected_vehicle_types.append(vehicle_type)
-
-    # Add some spacing after vehicle types
-    st.sidebar.markdown("---")
-
-    # Filter data based on selections
-    filtered_df = df[
-        (df['date'] >= selected_date_range[0]) & 
-        (df['date'] <= selected_date_range[-1]) & 
-        (df['hour'] >= time_range[0]) & 
-        (df['hour'] <= time_range[1]) &
-        (df['Vehicle Class'].isin(selected_vehicle_types))
-    ]
-    # Get traffic by detection group
-    if len(selected_vehicle_types) == 0:
-        st.warning("No vehicle types selected. Please select at least one vehicle type to see traffic data.")
-        entry_traffic = pd.DataFrame({'Detection Group': list(COORDINATES.keys()), 'CRZ Entries': [0] * len(COORDINATES)})
-    else:
-        entry_traffic = filtered_df.groupby('Detection Group')['CRZ Entries'].sum().reset_index()
     # Filter traffic data based on selected points
     filtered_traffic = entry_traffic[entry_traffic['Detection Group'].isin(st.session_state.selected_points)]
     # Calculate total traffic for selected points only

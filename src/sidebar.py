@@ -1,7 +1,7 @@
 # sidebar.py
 import streamlit as st
 import pandas as pd
-from constants import COORDINATES
+from src.constants import COORDINATES
 
 def render_sidebar(df):
     """
